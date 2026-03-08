@@ -24,16 +24,6 @@ export function withOwnerDefault<T extends { owner?: string }>(
   return { ...params, owner };
 }
 
-export function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
-  const parts: string[] = [];
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== "") {
-      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
-    }
-  }
-  return parts.length > 0 ? `?${parts.join("&")}` : "";
-}
-
 export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength - 3) + "...";

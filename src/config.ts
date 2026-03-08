@@ -15,10 +15,6 @@ const positiveInt = (defaultVal: number) =>
 const configSchema = z.object({
   githubToken: z.string().min(1, "GITHUB_TOKEN is required"),
   apiUrl: z.string().url().default("https://api.github.com"),
-  graphqlUrl: z
-    .string()
-    .url()
-    .default("https://api.github.com/graphql"),
   proxyUrl: z.string().url().optional(),
   insecure: booleanString,
 
@@ -30,7 +26,6 @@ const configSchema = z.object({
   cacheMax: positiveInt(500),
   requestTimeout: positiveInt(30000),
   maxRetries: positiveInt(3),
-  rateLimit: positiveInt(10),
 
   defaultOwner: z.string().optional(),
   defaultRepo: z.string().optional(),
@@ -42,7 +37,6 @@ export function loadConfig(): Config {
   const raw = {
     githubToken: process.env.GITHUB_TOKEN ?? "",
     apiUrl: process.env.GITHUB_API_URL,
-    graphqlUrl: process.env.GITHUB_GRAPHQL_URL,
     proxyUrl: process.env.GITHUB_PROXY_URL || process.env.HTTPS_PROXY || undefined,
     insecure: process.env.GITHUB_INSECURE,
     writeEnabled: process.env.GITHUB_WRITE_ENABLED,
@@ -52,7 +46,6 @@ export function loadConfig(): Config {
     cacheMax: process.env.GITHUB_CACHE_MAX,
     requestTimeout: process.env.GITHUB_REQUEST_TIMEOUT,
     maxRetries: process.env.GITHUB_MAX_RETRIES,
-    rateLimit: process.env.GITHUB_RATE_LIMIT,
     defaultOwner: process.env.GITHUB_DEFAULT_OWNER || undefined,
     defaultRepo: process.env.GITHUB_DEFAULT_REPO || undefined,
   };

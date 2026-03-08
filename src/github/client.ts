@@ -3,7 +3,7 @@ import { retry } from "@octokit/plugin-retry";
 import { throttling } from "@octokit/plugin-throttling";
 import type { Config } from "../config.js";
 import type { Cache } from "../cache.js";
-import { createDispatcher } from "./dispatcher.js";
+import { createCustomFetch } from "./dispatcher.js";
 
 type OctokitInstance = InstanceType<typeof Octokit>;
 
@@ -12,7 +12,7 @@ export class GitHubClient {
   readonly config: Config;
 
   constructor(config: Config, cache?: Cache) {
-    const dispatcher = createDispatcher(config);
+    const customFetch = createCustomFetch(config);
 
     this.config = config;
     const ExtendedOctokit = Octokit.plugin(retry, throttling);
@@ -20,9 +20,9 @@ export class GitHubClient {
       auth: config.githubToken,
       baseUrl: config.apiUrl,
       request: {
-        ...(dispatcher && { dispatcher }),
+        ...(customFetch && { fetch: customFetch }),
         timeout: config.requestTimeout,
-      } as Record<string, unknown>,
+      },
       throttle: {
         onRateLimit: (retryAfter: number, options: Record<string, unknown>, _octokit: unknown, retryCount: number) => {
           process.stderr.write(`Rate limit hit for ${options.url}, retrying after ${retryAfter}s (attempt ${retryCount + 1})\n`);

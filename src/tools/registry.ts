@@ -36,12 +36,6 @@ export const WRITE_ANNOTATION: ToolAnnotations = {
   idempotentHint: false,
 };
 
-export const MODIFY_ANNOTATION: ToolAnnotations = {
-  readOnlyHint: false,
-  destructiveHint: false,
-  idempotentHint: true,
-};
-
 export const DESTRUCTIVE_ANNOTATION: ToolAnnotations = {
   readOnlyHint: false,
   destructiveHint: true,

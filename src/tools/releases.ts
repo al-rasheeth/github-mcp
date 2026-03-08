@@ -75,7 +75,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       },
       annotations: WRITE_ANNOTATION,
     }, async (params) => {
-      const { owner, repo, ...rest } = withDefaults(params, config);
+      const { owner, repo } = withDefaults(params, config);
       const { data } = await client.octokit.rest.repos.createRelease({
         owner,
         repo,
