@@ -1,0 +1,25 @@
+{
+  "name": "github-mcp",
+  "version": "1.0.0",
+  "description": "STDIO-based GitHub MCP server using GitHub REST and GraphQL APIs",
+  "type": "module",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "lru-cache": "^11.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
