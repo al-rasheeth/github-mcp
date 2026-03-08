@@ -1,12 +1,12 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults, buildQueryString, formatDate } from "../utils/helpers.js";
 import { formatWorkflowRun } from "../utils/markdown.js";
 
 export function registerActionTools(server: McpServer, ctx: ToolContext): void {
-  const { client, config, cache } = ctx;
+  const { client, config } = ctx;
 
   if (!isGateEnabled("actions", config)) return;
 
@@ -18,6 +18,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<{ total_count: number; workflows: Array<Record<string, unknown>> }>(
@@ -46,6 +47,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       status: z.enum(["completed", "action_required", "cancelled", "failure", "neutral", "skipped", "stale", "success", "timed_out", "in_progress", "queued", "requested", "waiting", "pending"]).optional(),
       per_page: z.number().min(1).max(100).optional().default(20),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = buildQueryString({ branch: params.branch, event: params.event, status: params.status, per_page: params.per_page });
@@ -75,6 +77,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       run_id: z.number().describe("Workflow run ID"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/actions/runs/${params.run_id}`);
@@ -91,6 +94,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       run_id: z.number(),
       filter: z.enum(["latest", "all"]).optional().default("latest"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<{ total_count: number; jobs: Array<Record<string, unknown>> }>(
@@ -128,6 +132,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       run_id: z.number(),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       try {
@@ -167,6 +172,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       ref: z.string().describe("Branch or tag to run on"),
       inputs: z.record(z.string()).optional().describe("Workflow input parameters"),
     },
+    WRITE_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       await client.post(
@@ -185,6 +191,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       run_id: z.number(),
     },
+    WRITE_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       await client.post(`/repos/${owner}/${repo}/actions/runs/${params.run_id}/cancel`);
@@ -201,6 +208,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       run_id: z.number(),
       enable_debug_logging: z.boolean().optional().default(false),
     },
+    WRITE_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       await client.post(

@@ -26,6 +26,7 @@ async function main() {
 
   const client = new GitHubClient(config);
   const cache = new Cache(config);
+  client.cache = cache;
 
   const server = new McpServer({
     name: "github-mcp",

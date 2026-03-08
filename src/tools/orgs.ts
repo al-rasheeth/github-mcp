@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { withOwnerDefault, buildQueryString, formatDate } from "../utils/helpers.js";
+import { READ_ANNOTATION } from "./registry.js";
+import { withOwnerDefault, buildQueryString } from "../utils/helpers.js";
 import { formatRepoList } from "../utils/markdown.js";
 
 export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
@@ -15,6 +16,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
       role: z.enum(["all", "admin", "member"]).optional().default("all"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner: org } = withOwnerDefault({ owner: params.org }, config);
       const qs = buildQueryString({ role: params.role, per_page: params.per_page });
@@ -39,6 +41,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
       direction: z.enum(["asc", "desc"]).optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner: org } = withOwnerDefault({ owner: params.org }, config);
       const qs = buildQueryString({ type: params.type, sort: params.sort, direction: params.direction, per_page: params.per_page });
@@ -54,6 +57,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
       org: z.string().optional().describe("Organization name"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner: org } = withOwnerDefault({ owner: params.org }, config);
       const teams = await client.paginate<Record<string, unknown>>(`/orgs/${org}/teams?per_page=${params.per_page}`, undefined, 3);

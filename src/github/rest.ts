@@ -1,7 +1,8 @@
-import { ProxyAgent, Agent, type Dispatcher } from "undici";
+import type { Dispatcher } from "undici";
 import type { Config } from "../config.js";
 import type { RestResponse, RequestOptions, RateLimitInfo } from "./types.js";
 import { RateLimiter } from "./rate-limiter.js";
+import { createDispatcher } from "./dispatcher.js";
 
 export class RestClient {
   private baseUrl: string;
@@ -11,32 +12,13 @@ export class RestClient {
   private rateLimiter: RateLimiter;
   private dispatcher: Dispatcher | undefined;
 
-  constructor(config: Config, rateLimiter: RateLimiter) {
+  constructor(config: Config, rateLimiter: RateLimiter, dispatcher: Dispatcher | undefined) {
     this.baseUrl = config.apiUrl.replace(/\/+$/, "");
     this.token = config.githubToken;
     this.timeout = config.requestTimeout;
     this.maxRetries = config.maxRetries;
     this.rateLimiter = rateLimiter;
-    this.dispatcher = this.createDispatcher(config);
-  }
-
-  private createDispatcher(config: Config): Dispatcher | undefined {
-    const tlsOptions = config.insecure
-      ? { rejectUnauthorized: false }
-      : undefined;
-
-    if (config.proxyUrl) {
-      return new ProxyAgent({
-        uri: config.proxyUrl,
-        ...(tlsOptions && { requestTls: tlsOptions }),
-      });
-    }
-
-    if (tlsOptions) {
-      return new Agent({ connect: tlsOptions });
-    }
-
-    return undefined;
+    this.dispatcher = dispatcher;
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<RestResponse<T>> {

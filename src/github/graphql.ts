@@ -1,3 +1,4 @@
+import type { Dispatcher } from "undici";
 import type { Config } from "../config.js";
 import type { GraphQLResponse, PageInfo } from "./types.js";
 import { RateLimiter } from "./rate-limiter.js";
@@ -8,13 +9,15 @@ export class GraphQLClient {
   private timeout: number;
   private maxRetries: number;
   private rateLimiter: RateLimiter;
+  private dispatcher: Dispatcher | undefined;
 
-  constructor(config: Config, rateLimiter: RateLimiter) {
+  constructor(config: Config, rateLimiter: RateLimiter, dispatcher: Dispatcher | undefined) {
     this.url = config.graphqlUrl;
     this.token = config.githubToken;
     this.timeout = config.requestTimeout;
     this.maxRetries = config.maxRetries;
     this.rateLimiter = rateLimiter;
+    this.dispatcher = dispatcher;
   }
 
   async query<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
@@ -24,7 +27,7 @@ export class GraphQLClient {
       await this.rateLimiter.acquire();
 
       try {
-        const response = await fetch(this.url, {
+        const fetchOptions: Record<string, unknown> = {
           method: "POST",
           headers: {
             Authorization: `Bearer ${this.token}`,
@@ -32,7 +35,13 @@ export class GraphQLClient {
           },
           body: JSON.stringify({ query, variables }),
           signal: AbortSignal.timeout(this.timeout),
-        });
+        };
+
+        if (this.dispatcher) {
+          fetchOptions.dispatcher = this.dispatcher;
+        }
+
+        const response = await fetch(this.url, fetchOptions as RequestInit);
 
         const remaining = response.headers.get("x-ratelimit-remaining");
         const reset = response.headers.get("x-ratelimit-reset");

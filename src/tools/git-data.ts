@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
 import { formatTree } from "../utils/markdown.js";
 
@@ -17,6 +17,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
       tree_sha: z.string().describe("Tree SHA or branch name (e.g. 'main')"),
       recursive: z.boolean().optional().default(true),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = params.recursive ? "?recursive=1" : "";
@@ -37,6 +38,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
       repo: z.string().optional(),
       ref: z.string().describe("Reference (e.g. 'heads/main', 'tags/v1.0')"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/git/ref/${params.ref}`);
@@ -61,6 +63,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
           sha: z.string().optional().describe("SHA of existing object (alternative to content)"),
         })).describe("Tree entries"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const body: Record<string, unknown> = { tree: params.tree };
@@ -85,6 +88,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
           date: z.string().optional(),
         }).optional(),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const resp = await client.post<Record<string, unknown>>(`/repos/${owner}/${repo}/git/commits`, {

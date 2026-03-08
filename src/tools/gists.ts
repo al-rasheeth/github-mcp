@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { buildQueryString } from "../utils/helpers.js";
 import { formatGist, formatGistList } from "../utils/markdown.js";
 
@@ -16,6 +16,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
       since: z.string().optional().describe("ISO 8601 timestamp to filter by"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const qs = buildQueryString({ since: params.since, per_page: params.per_page });
       const path = params.username ? `/users/${params.username}/gists${qs}` : `/gists${qs}`;
@@ -30,6 +31,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
     {
       gist_id: z.string().describe("Gist ID"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const resp = await client.get<Record<string, unknown>>(`/gists/${params.gist_id}`);
       return { content: [{ type: "text" as const, text: formatGist(resp.data) }] };
@@ -47,6 +49,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
           content: z.string(),
         })).describe("Map of filename to content"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const resp = await client.post<Record<string, unknown>>("/gists", params);
         return { content: [{ type: "text" as const, text: formatGist(resp.data) }] };
@@ -64,6 +67,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
           filename: z.string().optional(),
         }).nullable()).describe("Map of filename to content (null to delete a file)"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { gist_id, ...body } = params;
         const resp = await client.patch<Record<string, unknown>>(`/gists/${gist_id}`, body);

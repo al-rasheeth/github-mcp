@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
+import { READ_ANNOTATION } from "./registry.js";
 import { buildQueryString } from "../utils/helpers.js";
 import { formatSearchResults, formatCommitList } from "../utils/markdown.js";
 
@@ -16,6 +17,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       order: z.enum(["asc", "desc"]).optional().default("desc"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const qs = buildQueryString({ q: params.query, sort: params.sort, order: params.order, per_page: params.per_page });
       const resp = await client.get<{ total_count: number; items: Record<string, unknown>[] }>(`/search/code${qs}`);
@@ -32,6 +34,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       order: z.enum(["asc", "desc"]).optional().default("desc"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const qs = buildQueryString({ q: params.query, sort: params.sort, order: params.order, per_page: params.per_page });
       const resp = await client.get<{ total_count: number; items: Record<string, unknown>[] }>(`/search/repositories${qs}`);
@@ -48,6 +51,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       order: z.enum(["asc", "desc"]).optional().default("desc"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const qs = buildQueryString({ q: params.query, sort: params.sort, order: params.order, per_page: params.per_page });
       const resp = await client.get<{ total_count: number; items: Record<string, unknown>[] }>(`/search/users${qs}`);
@@ -64,6 +68,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       order: z.enum(["asc", "desc"]).optional().default("desc"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const qs = buildQueryString({ q: params.query, sort: params.sort, order: params.order, per_page: params.per_page });
       const resp = await client.get<{ total_count: number; items: Record<string, unknown>[] }>(`/search/commits${qs}`, {

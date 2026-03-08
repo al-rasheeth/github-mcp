@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION, DESTRUCTIVE_ANNOTATION } from "./registry.js";
 import { withDefaults, withOwnerDefault, decodeBase64, buildQueryString } from "../utils/helpers.js";
 import { formatRepo, formatRepoList } from "../utils/markdown.js";
 
@@ -18,6 +18,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       direction: z.enum(["asc", "desc"]).optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const qs = buildQueryString({ type: params.type, sort: params.sort, direction: params.direction, per_page: params.per_page });
       const path = params.owner ? `/users/${params.owner}/repos${qs}` : `/user/repos${qs}`;
@@ -33,15 +34,13 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       owner: z.string().optional().describe("Repository owner"),
       repo: z.string().optional().describe("Repository name"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
-      const cacheKey = `repos:${owner}/${repo}`;
-      const cached = cache.get<Record<string, unknown>>(cacheKey);
-      if (cached) return { content: [{ type: "text" as const, text: formatRepo(cached.data) }] };
-
-      const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}`);
-      cache.set(cacheKey, resp.data, "repos", resp.etag);
-      return { content: [{ type: "text" as const, text: formatRepo(resp.data) }] };
+      const { data } = await client.cachedGet<Record<string, unknown>>(
+        `/repos/${owner}/${repo}`, `repos:${owner}/${repo}`, "repos"
+      );
+      return { content: [{ type: "text" as const, text: formatRepo(data) }] };
     }
   );
 
@@ -58,6 +57,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
         license_template: z.string().optional(),
         org: z.string().optional().describe("Create under this org instead of user"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const path = params.org ? `/orgs/${params.org}/repos` : "/user/repos";
         const resp = await client.post<Record<string, unknown>>(path, params);
@@ -81,6 +81,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
         default_branch: z.string().optional(),
         archived: z.boolean().optional(),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo, ...body } = withDefaults(params, config);
         const resp = await client.patch<Record<string, unknown>>(`/repos/${owner}/${repo}`, body);
@@ -99,6 +100,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
         repo: z.string().optional(),
         confirm: z.boolean().describe("Must be true to confirm deletion"),
       },
+      DESTRUCTIVE_ANNOTATION,
       async (params) => {
         if (!params.confirm) {
           return { content: [{ type: "text" as const, text: "Deletion not confirmed. Set `confirm: true` to proceed." }] };
@@ -118,6 +120,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       owner: z.string().optional(),
       repo: z.string().optional(),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<{ names: string[] }>(`/repos/${owner}/${repo}/topics`);
@@ -134,6 +137,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       owner: z.string().optional(),
       repo: z.string().optional(),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<Record<string, number>>(`/repos/${owner}/${repo}/languages`);
@@ -157,6 +161,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<Array<Record<string, unknown>>>(`/repos/${owner}/${repo}/contributors?per_page=${params.per_page}`);
@@ -179,6 +184,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       ref: z.string().optional().describe("Branch/tag/commit to read from"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = params.ref ? `?ref=${params.ref}` : "";
@@ -197,6 +203,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       path: z.string().describe("File path in the repo"),
       ref: z.string().optional().describe("Branch/tag/commit"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = params.ref ? `?ref=${params.ref}` : "";
@@ -233,6 +240,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
         branch: z.string().optional(),
         sha: z.string().optional().describe("SHA of file being replaced (required for updates)"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const body: Record<string, unknown> = {

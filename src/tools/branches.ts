@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION, DESTRUCTIVE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
 import { formatBranch, formatBranchList } from "../utils/markdown.js";
 
@@ -17,6 +17,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
       protected: z.boolean().optional().describe("Filter by protected status"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = new URLSearchParams();
@@ -35,15 +36,14 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       branch: z.string().describe("Branch name"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
-      const cacheKey = `branches:${owner}/${repo}:${params.branch}`;
-      const cached = cache.get<Record<string, unknown>>(cacheKey);
-      if (cached) return { content: [{ type: "text" as const, text: formatBranch(cached.data) }] };
-
-      const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/branches/${params.branch}`);
-      cache.set(cacheKey, resp.data, "branches", resp.etag);
-      return { content: [{ type: "text" as const, text: formatBranch(resp.data) }] };
+      const { data } = await client.cachedGet<Record<string, unknown>>(
+        `/repos/${owner}/${repo}/branches/${params.branch}`,
+        `branches:${owner}/${repo}:${params.branch}`, "branches"
+      );
+      return { content: [{ type: "text" as const, text: formatBranch(data) }] };
     }
   );
 
@@ -57,6 +57,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
         branch: z.string().describe("New branch name"),
         from_ref: z.string().optional().describe("Source ref (SHA, branch, or tag). Defaults to default branch HEAD."),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
 
@@ -91,6 +92,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
         repo: z.string().optional(),
         branch: z.string().describe("Branch to delete"),
       },
+      DESTRUCTIVE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         await client.delete(`/repos/${owner}/${repo}/git/refs/heads/${params.branch}`);
@@ -108,6 +110,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       branch: z.string().describe("Branch name"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       try {
@@ -151,6 +154,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
       base: z.string().describe("Base ref (branch, tag, or SHA)"),
       head: z.string().describe("Head ref to compare"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/compare/${params.base}...${params.head}`);

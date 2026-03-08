@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults, buildQueryString, formatDate } from "../utils/helpers.js";
 import { formatRelease } from "../utils/markdown.js";
 
@@ -16,6 +16,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       repo: z.string().optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const releases = await client.paginate<Record<string, unknown>>(
@@ -42,6 +43,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       release_id: z.number().optional().describe("Release ID"),
       tag: z.string().optional().describe("Tag name (alternative to release_id)"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       let path: string;
@@ -54,12 +56,8 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       }
 
       const cacheKey = `releases:${owner}/${repo}:${params.tag ?? params.release_id ?? "latest"}`;
-      const cached = cache.get<Record<string, unknown>>(cacheKey);
-      if (cached) return { content: [{ type: "text" as const, text: formatRelease(cached.data) }] };
-
-      const resp = await client.get<Record<string, unknown>>(path);
-      cache.set(cacheKey, resp.data, "releases", resp.etag);
-      return { content: [{ type: "text" as const, text: formatRelease(resp.data) }] };
+      const { data } = await client.cachedGet<Record<string, unknown>>(path, cacheKey, "releases");
+      return { content: [{ type: "text" as const, text: formatRelease(data) }] };
     }
   );
 
@@ -78,6 +76,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
         target_commitish: z.string().optional().describe("Branch or commit SHA"),
         generate_release_notes: z.boolean().optional().default(false),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo, ...body } = withDefaults(params, config);
         const resp = await client.post<Record<string, unknown>>(`/repos/${owner}/${repo}/releases`, body);
@@ -95,6 +94,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       repo: z.string().optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const tags = await client.paginate<Record<string, unknown>>(
@@ -121,6 +121,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       target_commitish: z.string().optional(),
       previous_tag_name: z.string().optional().describe("Previous tag to compare from"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.post<{ name: string; body: string }>(

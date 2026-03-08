@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { buildQueryString } from "../utils/helpers.js";
 import { formatUser, formatNotificationList } from "../utils/markdown.js";
 
@@ -12,6 +12,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
     "get_authenticated_user",
     "Get the currently authenticated user's profile",
     {},
+    READ_ANNOTATION,
     async () => {
       const resp = await client.get<Record<string, unknown>>("/user");
       return { content: [{ type: "text" as const, text: formatUser(resp.data) }] };
@@ -24,6 +25,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
     {
       username: z.string().describe("GitHub username"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const resp = await client.get<Record<string, unknown>>(`/users/${params.username}`);
       return { content: [{ type: "text" as const, text: formatUser(resp.data) }] };
@@ -39,6 +41,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
       since: z.string().optional().describe("ISO 8601 timestamp"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const qs = buildQueryString({
         all: params.all, participating: params.participating,
@@ -56,6 +59,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
       {
         last_read_at: z.string().optional().describe("ISO 8601 timestamp. Marks all before this as read. Defaults to now."),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const body = params.last_read_at ? { last_read_at: params.last_read_at } : {};
         await client.put("/notifications", body);

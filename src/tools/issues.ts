@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults, buildQueryString } from "../utils/helpers.js";
 import { formatIssue, formatIssueList, formatCommentList, formatMilestoneList, formatSearchResults } from "../utils/markdown.js";
 
@@ -17,6 +17,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       order: z.enum(["asc", "desc"]).optional().default("desc"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const qs = buildQueryString({ q: params.query, sort: params.sort, order: params.order, per_page: params.per_page });
       const resp = await client.get<{ total_count: number; items: Record<string, unknown>[] }>(`/search/issues${qs}`);
@@ -38,6 +39,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       direction: z.enum(["asc", "desc"]).optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = buildQueryString({
@@ -59,15 +61,14 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       issue_number: z.number().describe("Issue number"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
-      const cacheKey = `issues:${owner}/${repo}:${params.issue_number}`;
-      const cached = cache.get<Record<string, unknown>>(cacheKey);
-      if (cached) return { content: [{ type: "text" as const, text: formatIssue(cached.data) }] };
-
-      const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/issues/${params.issue_number}`);
-      cache.set(cacheKey, resp.data, "issues", resp.etag);
-      return { content: [{ type: "text" as const, text: formatIssue(resp.data) }] };
+      const { data } = await client.cachedGet<Record<string, unknown>>(
+        `/repos/${owner}/${repo}/issues/${params.issue_number}`,
+        `issues:${owner}/${repo}:${params.issue_number}`, "issues"
+      );
+      return { content: [{ type: "text" as const, text: formatIssue(data) }] };
     }
   );
 
@@ -84,6 +85,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         assignees: z.array(z.string()).optional(),
         milestone: z.number().optional(),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo, ...body } = withDefaults(params, config);
         const resp = await client.post<Record<string, unknown>>(`/repos/${owner}/${repo}/issues`, body);
@@ -106,6 +108,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         assignees: z.array(z.string()).optional(),
         milestone: z.number().nullable().optional(),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const { issue_number, ...body } = params;
@@ -124,6 +127,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         issue_number: z.number(),
         body: z.string().describe("Comment body (markdown)"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const resp = await client.post<Record<string, unknown>>(
@@ -143,6 +147,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         issue_number: z.number(),
         labels: z.array(z.string()).describe("Labels to add"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const resp = await client.post<Array<Record<string, unknown>>>(
@@ -163,6 +168,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         issue_number: z.number(),
         label: z.string().describe("Label name to remove"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         await client.delete(`/repos/${owner}/${repo}/issues/${params.issue_number}/labels/${encodeURIComponent(params.label)}`);
@@ -179,6 +185,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         issue_number: z.number(),
         lock_reason: z.enum(["off-topic", "too heated", "resolved", "spam"]).optional(),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const body = params.lock_reason ? { lock_reason: params.lock_reason } : undefined;
@@ -197,6 +204,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       issue_number: z.number(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const comments = await client.paginate<Record<string, unknown>>(
@@ -217,6 +225,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       sort: z.enum(["due_on", "completeness"]).optional(),
       direction: z.enum(["asc", "desc"]).optional(),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = buildQueryString({ state: params.state, sort: params.sort, direction: params.direction });

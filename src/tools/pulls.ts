@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
-import { isGateEnabled } from "./registry.js";
+import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults, buildQueryString, formatDate } from "../utils/helpers.js";
 import { formatPR, formatPRList, formatCommitList, formatCommentList } from "../utils/markdown.js";
 
@@ -21,6 +21,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       direction: z.enum(["asc", "desc"]).optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = buildQueryString({
@@ -40,15 +41,14 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       repo: z.string().optional(),
       pull_number: z.number().describe("PR number"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
-      const cacheKey = `pulls:${owner}/${repo}:${params.pull_number}`;
-      const cached = cache.get<Record<string, unknown>>(cacheKey);
-      if (cached) return { content: [{ type: "text" as const, text: formatPR(cached.data) }] };
-
-      const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/pulls/${params.pull_number}`);
-      cache.set(cacheKey, resp.data, "pulls", resp.etag);
-      return { content: [{ type: "text" as const, text: formatPR(resp.data) }] };
+      const { data } = await client.cachedGet<Record<string, unknown>>(
+        `/repos/${owner}/${repo}/pulls/${params.pull_number}`,
+        `pulls:${owner}/${repo}:${params.pull_number}`, "pulls"
+      );
+      return { content: [{ type: "text" as const, text: formatPR(data) }] };
     }
   );
 
@@ -65,6 +65,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         base: z.string().describe("Branch to merge into"),
         draft: z.boolean().optional().default(false),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo, ...body } = withDefaults(params, config);
         const resp = await client.post<Record<string, unknown>>(`/repos/${owner}/${repo}/pulls`, body);
@@ -85,6 +86,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         state: z.enum(["open", "closed"]).optional(),
         base: z.string().optional(),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const { pull_number, ...body } = params;
@@ -105,6 +107,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         commit_title: z.string().optional(),
         commit_message: z.string().optional(),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const resp = await client.put<Record<string, unknown>>(
@@ -136,6 +139,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
           body: z.string(),
         })).optional().describe("Inline comments"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         const resp = await client.post<Record<string, unknown>>(
@@ -156,6 +160,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         reviewers: z.array(z.string()).optional().describe("User logins"),
         team_reviewers: z.array(z.string()).optional().describe("Team slugs"),
       },
+      WRITE_ANNOTATION,
       async (params) => {
         const { owner, repo } = withDefaults(params, config);
         await client.post(
@@ -177,6 +182,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       pull_number: z.number(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const commits = await client.paginate<Record<string, unknown>>(
@@ -196,6 +202,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       pull_number: z.number(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const files = await client.paginate<Record<string, unknown>>(
@@ -220,6 +227,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       repo: z.string().optional(),
       pull_number: z.number(),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const response = await client.getRaw(
@@ -239,6 +247,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       repo: z.string().optional(),
       pull_number: z.number(),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const reviews = await client.paginate<Record<string, unknown>>(
@@ -274,6 +283,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       pull_number: z.number(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const comments = await client.paginate<Record<string, unknown>>(
@@ -305,6 +315,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       repo: z.string().optional(),
       pull_number: z.number(),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const pr = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/pulls/${params.pull_number}`);

@@ -3,21 +3,52 @@ import type { RestResponse, RequestOptions, PageInfo } from "./types.js";
 import { RestClient } from "./rest.js";
 import { GraphQLClient } from "./graphql.js";
 import { RateLimiter } from "./rate-limiter.js";
+import { createDispatcher } from "./dispatcher.js";
+import type { Cache } from "../cache.js";
 
 export class GitHubClient {
   readonly rest: RestClient;
   readonly graphql: GraphQLClient;
   readonly config: Config;
+  cache: Cache | undefined;
 
   constructor(config: Config) {
     const rateLimiter = new RateLimiter(config.rateLimit);
-    this.rest = new RestClient(config, rateLimiter);
-    this.graphql = new GraphQLClient(config, rateLimiter);
+    const dispatcher = createDispatcher(config);
+    this.rest = new RestClient(config, rateLimiter, dispatcher);
+    this.graphql = new GraphQLClient(config, rateLimiter, dispatcher);
     this.config = config;
   }
 
   async get<T>(path: string, options?: RequestOptions): Promise<RestResponse<T>> {
     return this.rest.request<T>(path, { ...options, method: "GET" });
+  }
+
+  async cachedGet<T>(
+    path: string,
+    cacheKey: string,
+    entityType: string,
+    options?: RequestOptions
+  ): Promise<{ data: T; fromCache: boolean }> {
+    if (this.cache) {
+      const cached = this.cache.get<T>(cacheKey);
+      if (cached) {
+        if (cached.etag) {
+          const headers = { ...options?.headers, "If-None-Match": cached.etag };
+          const resp = await this.rest.request<T>(path, { ...options, method: "GET", headers });
+          if (resp.status === 304) {
+            return { data: cached.data, fromCache: true };
+          }
+          this.cache.set(cacheKey, resp.data, entityType, resp.etag);
+          return { data: resp.data, fromCache: false };
+        }
+        return { data: cached.data, fromCache: true };
+      }
+    }
+
+    const resp = await this.rest.request<T>(path, { ...options, method: "GET" });
+    this.cache?.set(cacheKey, resp.data, entityType, resp.etag);
+    return { data: resp.data, fromCache: false };
   }
 
   async post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<RestResponse<T>> {

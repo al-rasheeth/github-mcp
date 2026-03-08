@@ -1,11 +1,12 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
+import { READ_ANNOTATION } from "./registry.js";
 import { withDefaults, buildQueryString } from "../utils/helpers.js";
 import { formatCommit, formatCommitList } from "../utils/markdown.js";
 
 export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
-  const { client, config, cache } = ctx;
+  const { client, config } = ctx;
 
   server.tool(
     "list_commits",
@@ -20,6 +21,7 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
       until: z.string().optional().describe("ISO 8601 date"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const qs = buildQueryString({
@@ -41,6 +43,7 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
       repo: z.string().optional(),
       ref: z.string().describe("Commit SHA, branch, or tag"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/commits/${params.ref}`);
@@ -57,6 +60,7 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
       base: z.string().describe("Base ref"),
       head: z.string().describe("Head ref"),
     },
+    READ_ANNOTATION,
     async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.get<Record<string, unknown>>(
