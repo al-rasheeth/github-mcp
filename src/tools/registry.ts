@@ -2,12 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { GitHubClient } from "../github/client.js";
 import type { Config } from "../config.js";
-import type { Cache } from "../cache.js";
-
 export interface ToolContext {
   client: GitHubClient;
   config: Config;
-  cache: Cache;
 }
 
 export type ToolRegistrar = (server: McpServer, ctx: ToolContext) => void;

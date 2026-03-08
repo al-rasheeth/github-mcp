@@ -2,33 +2,35 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
-import { withDefaults, buildQueryString } from "../utils/helpers.js";
+import { withDefaults } from "../utils/helpers.js";
 import { formatIssue, formatIssueList, formatCommentList, formatMilestoneList, formatSearchResults } from "../utils/markdown.js";
 
 export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
-  const { client, config, cache } = ctx;
+  const { client, config } = ctx;
 
-  server.tool(
-    "search_issues",
-    "Search issues and pull requests using GitHub search syntax",
-    {
+  server.registerTool("search_issues", {
+    description: "Search issues and pull requests using GitHub search syntax",
+    inputSchema: {
       query: z.string().describe("GitHub search query (e.g. 'is:issue is:open label:bug repo:owner/repo')"),
       sort: z.enum(["comments", "reactions", "reactions-+1", "reactions--1", "interactions", "created", "updated"]).optional(),
       order: z.enum(["asc", "desc"]).optional().default("desc"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const qs = buildQueryString({ q: params.query, sort: params.sort, order: params.order, per_page: params.per_page });
-      const resp = await client.get<{ total_count: number; items: Record<string, unknown>[] }>(`/search/issues${qs}`);
-      return { content: [{ type: "text" as const, text: formatSearchResults(resp.data.items, "issues", resp.data.total_count) }] };
-    }
-  );
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const resp = await client.octokit.rest.search.issuesAndPullRequests({
+      q: params.query,
+      sort: params.sort,
+      order: params.order,
+      per_page: params.per_page,
+    });
+    const items = resp.data.items as Record<string, unknown>[];
+    return { content: [{ type: "text" as const, text: formatSearchResults(items, "issues", resp.data.total_count) }] };
+  });
 
-  server.tool(
-    "list_issues",
-    "List issues for a repository with filtering options",
-    {
+  server.registerTool("list_issues", {
+    description: "List issues for a repository with filtering options",
+    inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
       state: z.enum(["open", "closed", "all"]).optional().default("open"),
@@ -39,44 +41,42 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       direction: z.enum(["asc", "desc"]).optional(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const { owner, repo } = withDefaults(params, config);
-      const qs = buildQueryString({
-        state: params.state, labels: params.labels, assignee: params.assignee,
-        milestone: params.milestone, sort: params.sort, direction: params.direction,
-        per_page: params.per_page,
-      });
-      const issues = await client.paginate<Record<string, unknown>>(`/repos/${owner}/${repo}/issues${qs}`, undefined, 3);
-      const filtered = issues.filter((i) => !i.pull_request);
-      return { content: [{ type: "text" as const, text: formatIssueList(filtered) }] };
-    }
-  );
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const { owner, repo } = withDefaults(params, config);
+    const issues = await client.octokit.paginate(client.octokit.rest.issues.listForRepo, {
+      owner,
+      repo,
+      state: params.state,
+      labels: params.labels,
+      assignee: params.assignee,
+      milestone: params.milestone,
+      sort: params.sort,
+      direction: params.direction,
+      per_page: params.per_page,
+    });
+    const filtered = issues.filter((i) => !(i as Record<string, unknown>).pull_request);
+    return { content: [{ type: "text" as const, text: formatIssueList(filtered as Record<string, unknown>[]) }] };
+  });
 
-  server.tool(
-    "get_issue",
-    "Get full issue details with body, labels, assignees, milestone",
-    {
+  server.registerTool("get_issue", {
+    description: "Get full issue details with body, labels, assignees, milestone",
+    inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
       issue_number: z.number().describe("Issue number"),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const { owner, repo } = withDefaults(params, config);
-      const { data } = await client.cachedGet<Record<string, unknown>>(
-        `/repos/${owner}/${repo}/issues/${params.issue_number}`,
-        `issues:${owner}/${repo}:${params.issue_number}`, "issues"
-      );
-      return { content: [{ type: "text" as const, text: formatIssue(data) }] };
-    }
-  );
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const { owner, repo } = withDefaults(params, config);
+    const resp = await client.octokit.rest.issues.get({ owner, repo, issue_number: params.issue_number });
+    return { content: [{ type: "text" as const, text: formatIssue(resp.data as Record<string, unknown>) }] };
+  });
 
   if (isGateEnabled("write", config)) {
-    server.tool(
-      "create_issue",
-      "Create a new issue",
-      {
+    server.registerTool("create_issue", {
+      description: "Create a new issue",
+      inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
         title: z.string().describe("Issue title"),
@@ -85,19 +85,24 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         assignees: z.array(z.string()).optional(),
         milestone: z.number().optional(),
       },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const { owner, repo, ...body } = withDefaults(params, config);
-        const resp = await client.post<Record<string, unknown>>(`/repos/${owner}/${repo}/issues`, body);
-        cache.invalidatePrefix(`issues:${owner}/${repo}`);
-        return { content: [{ type: "text" as const, text: formatIssue(resp.data) }] };
-      }
-    );
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      const { owner, repo } = withDefaults(params, config);
+      const resp = await client.octokit.rest.issues.create({
+        owner,
+        repo,
+        title: params.title,
+        body: params.body,
+        labels: params.labels,
+        assignees: params.assignees,
+        milestone: params.milestone,
+      });
+      return { content: [{ type: "text" as const, text: formatIssue(resp.data as Record<string, unknown>) }] };
+    });
 
-    server.tool(
-      "update_issue",
-      "Update an existing issue",
-      {
+    server.registerTool("update_issue", {
+      description: "Update an existing issue",
+      inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
         issue_number: z.number(),
@@ -108,129 +113,144 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         assignees: z.array(z.string()).optional(),
         milestone: z.number().nullable().optional(),
       },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const { owner, repo } = withDefaults(params, config);
-        const { issue_number, ...body } = params;
-        const resp = await client.patch<Record<string, unknown>>(`/repos/${owner}/${repo}/issues/${issue_number}`, body);
-        cache.invalidatePrefix(`issues:${owner}/${repo}`);
-        return { content: [{ type: "text" as const, text: formatIssue(resp.data) }] };
-      }
-    );
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      const { owner, repo } = withDefaults(params, config);
+      const resp = await client.octokit.rest.issues.update({
+        owner,
+        repo,
+        issue_number: params.issue_number,
+        title: params.title,
+        body: params.body,
+        state: params.state,
+        labels: params.labels,
+        assignees: params.assignees,
+        milestone: params.milestone ?? undefined,
+      });
+      return { content: [{ type: "text" as const, text: formatIssue(resp.data as Record<string, unknown>) }] };
+    });
 
-    server.tool(
-      "add_issue_comment",
-      "Add a comment to an issue",
-      {
+    server.registerTool("add_issue_comment", {
+      description: "Add a comment to an issue",
+      inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
         issue_number: z.number(),
         body: z.string().describe("Comment body (markdown)"),
       },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const { owner, repo } = withDefaults(params, config);
-        const resp = await client.post<Record<string, unknown>>(
-          `/repos/${owner}/${repo}/issues/${params.issue_number}/comments`,
-          { body: params.body }
-        );
-        return { content: [{ type: "text" as const, text: `Comment added: ${resp.data.html_url}` }] };
-      }
-    );
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      const { owner, repo } = withDefaults(params, config);
+      const resp = await client.octokit.rest.issues.createComment({
+        owner,
+        repo,
+        issue_number: params.issue_number,
+        body: params.body,
+      });
+      return { content: [{ type: "text" as const, text: `Comment added: ${(resp.data as Record<string, unknown>).html_url}` }] };
+    });
 
-    server.tool(
-      "add_issue_labels",
-      "Add labels to an issue",
-      {
+    server.registerTool("add_issue_labels", {
+      description: "Add labels to an issue",
+      inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
         issue_number: z.number(),
         labels: z.array(z.string()).describe("Labels to add"),
       },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const { owner, repo } = withDefaults(params, config);
-        const resp = await client.post<Array<Record<string, unknown>>>(
-          `/repos/${owner}/${repo}/issues/${params.issue_number}/labels`,
-          { labels: params.labels }
-        );
-        const names = resp.data.map((l) => `\`${l.name}\``).join(", ");
-        return { content: [{ type: "text" as const, text: `Labels on issue #${params.issue_number}: ${names}` }] };
-      }
-    );
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      const { owner, repo } = withDefaults(params, config);
+      const resp = await client.octokit.rest.issues.addLabels({
+        owner,
+        repo,
+        issue_number: params.issue_number,
+        labels: params.labels,
+      });
+      const names = (resp.data as Record<string, unknown>[]).map((l) => `\`${l.name}\``).join(", ");
+      return { content: [{ type: "text" as const, text: `Labels on issue #${params.issue_number}: ${names}` }] };
+    });
 
-    server.tool(
-      "remove_issue_label",
-      "Remove a label from an issue",
-      {
+    server.registerTool("remove_issue_label", {
+      description: "Remove a label from an issue",
+      inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
         issue_number: z.number(),
         label: z.string().describe("Label name to remove"),
       },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const { owner, repo } = withDefaults(params, config);
-        await client.delete(`/repos/${owner}/${repo}/issues/${params.issue_number}/labels/${encodeURIComponent(params.label)}`);
-        return { content: [{ type: "text" as const, text: `Label \`${params.label}\` removed from issue #${params.issue_number}.` }] };
-      }
-    );
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      const { owner, repo } = withDefaults(params, config);
+      await client.octokit.rest.issues.removeLabel({
+        owner,
+        repo,
+        issue_number: params.issue_number,
+        name: params.label,
+      });
+      return { content: [{ type: "text" as const, text: `Label \`${params.label}\` removed from issue #${params.issue_number}.` }] };
+    });
 
-    server.tool(
-      "lock_issue",
-      "Lock an issue conversation",
-      {
+    server.registerTool("lock_issue", {
+      description: "Lock an issue conversation",
+      inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
         issue_number: z.number(),
         lock_reason: z.enum(["off-topic", "too heated", "resolved", "spam"]).optional(),
       },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const { owner, repo } = withDefaults(params, config);
-        const body = params.lock_reason ? { lock_reason: params.lock_reason } : undefined;
-        await client.put(`/repos/${owner}/${repo}/issues/${params.issue_number}/lock`, body);
-        return { content: [{ type: "text" as const, text: `Issue #${params.issue_number} has been locked.` }] };
-      }
-    );
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      const { owner, repo } = withDefaults(params, config);
+      await client.octokit.rest.issues.lock({
+        owner,
+        repo,
+        issue_number: params.issue_number,
+        lock_reason: params.lock_reason,
+      });
+      return { content: [{ type: "text" as const, text: `Issue #${params.issue_number} has been locked.` }] };
+    });
   }
 
-  server.tool(
-    "list_issue_comments",
-    "List comments on an issue",
-    {
+  server.registerTool("list_issue_comments", {
+    description: "List comments on an issue",
+    inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
       issue_number: z.number(),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const { owner, repo } = withDefaults(params, config);
-      const comments = await client.paginate<Record<string, unknown>>(
-        `/repos/${owner}/${repo}/issues/${params.issue_number}/comments?per_page=${params.per_page}`,
-        undefined, 3
-      );
-      return { content: [{ type: "text" as const, text: formatCommentList(comments) }] };
-    }
-  );
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const { owner, repo } = withDefaults(params, config);
+    const comments = await client.octokit.paginate(client.octokit.rest.issues.listComments, {
+      owner,
+      repo,
+      issue_number: params.issue_number,
+      per_page: params.per_page,
+    });
+    return { content: [{ type: "text" as const, text: formatCommentList(comments as Record<string, unknown>[]) }] };
+  });
 
-  server.tool(
-    "list_milestones",
-    "List milestones for a repository",
-    {
+  server.registerTool("list_milestones", {
+    description: "List milestones for a repository",
+    inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
       state: z.enum(["open", "closed", "all"]).optional().default("open"),
       sort: z.enum(["due_on", "completeness"]).optional(),
       direction: z.enum(["asc", "desc"]).optional(),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const { owner, repo } = withDefaults(params, config);
-      const qs = buildQueryString({ state: params.state, sort: params.sort, direction: params.direction });
-      const milestones = await client.paginate<Record<string, unknown>>(`/repos/${owner}/${repo}/milestones${qs}`, undefined, 3);
-      return { content: [{ type: "text" as const, text: formatMilestoneList(milestones) }] };
-    }
-  );
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const { owner, repo } = withDefaults(params, config);
+    const milestones = await client.octokit.paginate(client.octokit.rest.issues.listMilestones, {
+      owner,
+      repo,
+      state: params.state,
+      sort: params.sort,
+      direction: params.direction,
+    });
+    return { content: [{ type: "text" as const, text: formatMilestoneList(milestones as Record<string, unknown>[]) }] };
+  });
 }

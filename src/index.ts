@@ -24,16 +24,15 @@ import { registerPrompts } from "./prompts.js";
 async function main() {
   const config = loadConfig();
 
-  const client = new GitHubClient(config);
   const cache = new Cache(config);
-  client.cache = cache;
+  const client = new GitHubClient(config, cache);
 
   const server = new McpServer({
     name: "github-mcp",
     version: "1.0.0",
   });
 
-  const ctx: ToolContext = { client, config, cache };
+  const ctx: ToolContext = { client, config };
 
   registerAllTools(server, ctx, [
     registerRepoTools,

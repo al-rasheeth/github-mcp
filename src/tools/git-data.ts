@@ -6,52 +6,53 @@ import { withDefaults } from "../utils/helpers.js";
 import { formatTree } from "../utils/markdown.js";
 
 export function registerGitDataTools(server: McpServer, ctx: ToolContext): void {
-  const { client, config, cache } = ctx;
+  const { client, config } = ctx;
 
-  server.tool(
-    "get_tree",
-    "Get the file tree of a repository at a given ref (recursive)",
-    {
+  server.registerTool("get_tree", {
+    description: "Get the file tree of a repository at a given ref (recursive)",
+    inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
       tree_sha: z.string().describe("Tree SHA or branch name (e.g. 'main')"),
       recursive: z.boolean().optional().default(true),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const { owner, repo } = withDefaults(params, config);
-      const qs = params.recursive ? "?recursive=1" : "";
-      const resp = await client.get<{ sha: string; tree: Array<Record<string, unknown>>; truncated: boolean }>(
-        `/repos/${owner}/${repo}/git/trees/${params.tree_sha}${qs}`
-      );
-      const text = formatTree(resp.data.tree);
-      const truncNote = resp.data.truncated ? "\n\n**Note:** Tree was truncated due to size." : "";
-      return { content: [{ type: "text" as const, text: text + truncNote }] };
-    }
-  );
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const { owner, repo } = withDefaults(params, config);
+    const { data } = await client.octokit.rest.git.getTree({
+      owner,
+      repo,
+      tree_sha: params.tree_sha,
+      ...(params.recursive ? { recursive: "1" as const } : {}),
+    });
+    const text = formatTree(data.tree as Array<Record<string, unknown>>);
+    const truncNote = data.truncated ? "\n\n**Note:** Tree was truncated due to size." : "";
+    return { content: [{ type: "text" as const, text: text + truncNote }] };
+  });
 
-  server.tool(
-    "get_ref",
-    "Get a git reference (branch/tag SHA)",
-    {
+  server.registerTool("get_ref", {
+    description: "Get a git reference (branch/tag SHA)",
+    inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
       ref: z.string().describe("Reference (e.g. 'heads/main', 'tags/v1.0')"),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const { owner, repo } = withDefaults(params, config);
-      const resp = await client.get<Record<string, unknown>>(`/repos/${owner}/${repo}/git/ref/${params.ref}`);
-      const obj = resp.data.object as Record<string, unknown>;
-      return { content: [{ type: "text" as const, text: `**Ref:** \`${resp.data.ref}\`\n**SHA:** \`${obj.sha}\`\n**Type:** ${obj.type}` }] };
-    }
-  );
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const { owner, repo } = withDefaults(params, config);
+    const { data } = await client.octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: params.ref,
+    });
+    const obj = data.object as Record<string, unknown>;
+    return { content: [{ type: "text" as const, text: `**Ref:** \`${data.ref}\`\n**SHA:** \`${obj.sha}\`\n**Type:** ${obj.type}` }] };
+  });
 
   if (isGateEnabled("write", config)) {
-    server.tool(
-      "create_tree",
-      "Create a tree object for multi-file commits",
-      {
+    server.registerTool("create_tree", {
+      description: "Create a tree object for multi-file commits",
+      inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
         base_tree: z.string().optional().describe("SHA of base tree to build on"),
@@ -63,20 +64,22 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
           sha: z.string().optional().describe("SHA of existing object (alternative to content)"),
         })).describe("Tree entries"),
       },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const { owner, repo } = withDefaults(params, config);
-        const body: Record<string, unknown> = { tree: params.tree };
-        if (params.base_tree) body.base_tree = params.base_tree;
-        const resp = await client.post<Record<string, unknown>>(`/repos/${owner}/${repo}/git/trees`, body);
-        return { content: [{ type: "text" as const, text: `Tree created: \`${resp.data.sha}\`` }] };
-      }
-    );
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      const { owner, repo } = withDefaults(params, config);
+      const body: { tree: typeof params.tree; base_tree?: string } = { tree: params.tree };
+      if (params.base_tree) body.base_tree = params.base_tree;
+      const { data } = await client.octokit.rest.git.createTree({
+        owner,
+        repo,
+        ...body,
+      });
+      return { content: [{ type: "text" as const, text: `Tree created: \`${data.sha}\`` }] };
+    });
 
-    server.tool(
-      "create_commit_object",
-      "Create a commit via the Git Data API (for atomic multi-file commits)",
-      {
+    server.registerTool("create_commit_object", {
+      description: "Create a commit via the Git Data API (for atomic multi-file commits)",
+      inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
         message: z.string().describe("Commit message"),
@@ -88,19 +91,18 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
           date: z.string().optional(),
         }).optional(),
       },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const { owner, repo } = withDefaults(params, config);
-        const resp = await client.post<Record<string, unknown>>(`/repos/${owner}/${repo}/git/commits`, {
-          message: params.message,
-          tree: params.tree,
-          parents: params.parents,
-          author: params.author,
-        });
-        cache.invalidatePrefix(`repos:${owner}/${repo}`);
-        cache.invalidatePrefix(`branches:${owner}/${repo}`);
-        return { content: [{ type: "text" as const, text: `Commit created: \`${resp.data.sha}\`\nMessage: ${params.message}` }] };
-      }
-    );
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      const { owner, repo } = withDefaults(params, config);
+      const { data } = await client.octokit.rest.git.createCommit({
+        owner,
+        repo,
+        message: params.message,
+        tree: params.tree,
+        parents: params.parents,
+        author: params.author,
+      });
+      return { content: [{ type: "text" as const, text: `Commit created: \`${data.sha}\`\nMessage: ${params.message}` }] };
+    });
   }
 }

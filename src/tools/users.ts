@@ -2,69 +2,65 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
-import { buildQueryString } from "../utils/helpers.js";
 import { formatUser, formatNotificationList } from "../utils/markdown.js";
 
 export function registerUserTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
 
-  server.tool(
-    "get_authenticated_user",
-    "Get the currently authenticated user's profile",
-    {},
-    READ_ANNOTATION,
-    async () => {
-      const resp = await client.get<Record<string, unknown>>("/user");
-      return { content: [{ type: "text" as const, text: formatUser(resp.data) }] };
-    }
-  );
+  server.registerTool("get_authenticated_user", {
+    description: "Get the currently authenticated user's profile",
+    inputSchema: {},
+    annotations: READ_ANNOTATION,
+  }, async () => {
+    const { data } = await client.octokit.rest.users.getAuthenticated();
+    return { content: [{ type: "text" as const, text: formatUser(data as Record<string, unknown>) }] };
+  });
 
-  server.tool(
-    "get_user",
-    "Get a user's public profile",
-    {
+  server.registerTool("get_user", {
+    description: "Get a user's public profile",
+    inputSchema: {
       username: z.string().describe("GitHub username"),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const resp = await client.get<Record<string, unknown>>(`/users/${params.username}`);
-      return { content: [{ type: "text" as const, text: formatUser(resp.data) }] };
-    }
-  );
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const { data } = await client.octokit.rest.users.getByUsername({ username: params.username });
+    return { content: [{ type: "text" as const, text: formatUser(data as Record<string, unknown>) }] };
+  });
 
-  server.tool(
-    "list_notifications",
-    "List notifications for the authenticated user",
-    {
+  server.registerTool("list_notifications", {
+    description: "List notifications for the authenticated user",
+    inputSchema: {
       all: z.boolean().optional().default(false).describe("Include read notifications"),
       participating: z.boolean().optional().default(false),
       since: z.string().optional().describe("ISO 8601 timestamp"),
       per_page: z.number().min(1).max(100).optional().default(30),
     },
-    READ_ANNOTATION,
-    async (params) => {
-      const qs = buildQueryString({
-        all: params.all, participating: params.participating,
-        since: params.since, per_page: params.per_page,
-      });
-      const notifications = await client.paginate<Record<string, unknown>>(`/notifications${qs}`, undefined, 3);
-      return { content: [{ type: "text" as const, text: formatNotificationList(notifications) }] };
-    }
-  );
-
-  if (isGateEnabled("write", config)) {
-    server.tool(
-      "mark_notifications_read",
-      "Mark notifications as read",
+    annotations: READ_ANNOTATION,
+  }, async (params) => {
+    const notifications = await client.octokit.paginate(
+      client.octokit.rest.activity.listNotificationsForAuthenticatedUser,
       {
-        last_read_at: z.string().optional().describe("ISO 8601 timestamp. Marks all before this as read. Defaults to now."),
-      },
-      WRITE_ANNOTATION,
-      async (params) => {
-        const body = params.last_read_at ? { last_read_at: params.last_read_at } : {};
-        await client.put("/notifications", body);
-        return { content: [{ type: "text" as const, text: "All notifications marked as read." }] };
+        all: params.all,
+        participating: params.participating,
+        since: params.since,
+        per_page: params.per_page,
       }
     );
+    return { content: [{ type: "text" as const, text: formatNotificationList(notifications as Record<string, unknown>[]) }] };
+  });
+
+  if (isGateEnabled("write", config)) {
+    server.registerTool("mark_notifications_read", {
+      description: "Mark notifications as read",
+      inputSchema: {
+        last_read_at: z.string().optional().describe("ISO 8601 timestamp. Marks all before this as read. Defaults to now."),
+      },
+      annotations: WRITE_ANNOTATION,
+    }, async (params) => {
+      await client.octokit.rest.activity.markNotificationsAsRead(
+        params.last_read_at ? { last_read_at: params.last_read_at } : {}
+      );
+      return { content: [{ type: "text" as const, text: "All notifications marked as read." }] };
+    });
   }
 }

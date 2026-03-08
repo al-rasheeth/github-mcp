@@ -2,10 +2,32 @@ import { LRUCache } from "lru-cache";
 import { ENTITY_TTL } from "./config.js";
 import type { Config } from "./config.js";
 
-interface CacheEntry<T = unknown> {
-  data: T;
+interface CacheEntry {
+  response: unknown;
   etag?: string;
-  entityType?: string;
+  entityType: string;
+}
+
+const ENTITY_PATTERNS: [RegExp, string][] = [
+  [/\/repos\/[^/]+\/[^/]+\/pulls\//, "pulls"],
+  [/\/repos\/[^/]+\/[^/]+\/issues\//, "issues"],
+  [/\/repos\/[^/]+\/[^/]+\/branches\//, "branches"],
+  [/\/repos\/[^/]+\/[^/]+\/releases\//, "releases"],
+  [/\/repos\/[^/]+\/[^/]+\/actions\//, "workflows"],
+  [/\/repos\/[^/]+\/[^/]+/, "repos"],
+  [/\/users\//, "users"],
+];
+
+function inferEntityType(url: string): string {
+  for (const [pattern, type] of ENTITY_PATTERNS) {
+    if (pattern.test(url)) return type;
+  }
+  return "default";
+}
+
+function deriveCacheScope(url: string): string {
+  const match = url.match(/\/repos\/([^/]+\/[^/]+)/);
+  return match ? match[1] : url;
 }
 
 export class Cache {
@@ -20,30 +42,25 @@ export class Cache {
     });
   }
 
-  get<T>(key: string): { data: T; etag?: string } | undefined {
-    const entry = this.store.get(key) as CacheEntry<T> | undefined;
+  getEntry(url: string): { response: unknown; etag?: string } | undefined {
+    const entry = this.store.get(url);
     if (!entry) return undefined;
-    return { data: entry.data, etag: entry.etag };
+    return { response: entry.response, etag: entry.etag };
   }
 
-  set<T>(key: string, data: T, entityType?: string, etag?: string): void {
-    const ttlSeconds = entityType ? ENTITY_TTL[entityType] : undefined;
+  setEntry(url: string, response: unknown, etag?: string): void {
+    const entityType = inferEntityType(url);
+    const ttlSeconds = ENTITY_TTL[entityType];
     const ttl = ttlSeconds ? ttlSeconds * 1000 : this.defaultTtl;
-
-    this.store.set(
-      key,
-      { data, etag, entityType },
-      { ttl }
-    );
+    this.store.set(url, { response, etag, entityType }, { ttl });
   }
 
-  invalidate(key: string): void {
-    this.store.delete(key);
-  }
-
-  invalidatePrefix(prefix: string): void {
+  invalidateForWrite(url: string): void {
+    const scope = deriveCacheScope(url);
+    const entityType = inferEntityType(url);
     for (const key of this.store.keys()) {
-      if (key.startsWith(prefix)) {
+      const entry = this.store.peek(key);
+      if (entry && entry.entityType === entityType && key.includes(scope)) {
         this.store.delete(key);
       }
     }

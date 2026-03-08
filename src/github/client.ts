@@ -1,89 +1,84 @@
+import { Octokit } from "@octokit/rest";
+import { retry } from "@octokit/plugin-retry";
+import { throttling } from "@octokit/plugin-throttling";
 import type { Config } from "../config.js";
-import type { RestResponse, RequestOptions, PageInfo } from "./types.js";
-import { RestClient } from "./rest.js";
-import { GraphQLClient } from "./graphql.js";
-import { RateLimiter } from "./rate-limiter.js";
-import { createDispatcher } from "./dispatcher.js";
 import type { Cache } from "../cache.js";
+import { createDispatcher } from "./dispatcher.js";
+
+type OctokitInstance = InstanceType<typeof Octokit>;
 
 export class GitHubClient {
-  readonly rest: RestClient;
-  readonly graphql: GraphQLClient;
+  readonly octokit: OctokitInstance;
   readonly config: Config;
-  cache: Cache | undefined;
 
-  constructor(config: Config) {
-    const rateLimiter = new RateLimiter(config.rateLimit);
+  constructor(config: Config, cache?: Cache) {
     const dispatcher = createDispatcher(config);
-    this.rest = new RestClient(config, rateLimiter, dispatcher);
-    this.graphql = new GraphQLClient(config, rateLimiter, dispatcher);
+
     this.config = config;
-  }
+    const ExtendedOctokit = Octokit.plugin(retry, throttling);
+    this.octokit = new ExtendedOctokit({
+      auth: config.githubToken,
+      baseUrl: config.apiUrl,
+      request: {
+        ...(dispatcher && { dispatcher }),
+        timeout: config.requestTimeout,
+      } as Record<string, unknown>,
+      throttle: {
+        onRateLimit: (retryAfter: number, options: Record<string, unknown>, _octokit: unknown, retryCount: number) => {
+          process.stderr.write(`Rate limit hit for ${options.url}, retrying after ${retryAfter}s (attempt ${retryCount + 1})\n`);
+          return retryCount < config.maxRetries;
+        },
+        onSecondaryRateLimit: (retryAfter: number, options: Record<string, unknown>, _octokit: unknown, retryCount: number) => {
+          process.stderr.write(`Secondary rate limit hit for ${options.url}, retrying after ${retryAfter}s\n`);
+          return retryCount < 1;
+        },
+      },
+      retry: {
+        doNotRetry: [429],
+      },
+    });
 
-  async get<T>(path: string, options?: RequestOptions): Promise<RestResponse<T>> {
-    return this.rest.request<T>(path, { ...options, method: "GET" });
-  }
-
-  async cachedGet<T>(
-    path: string,
-    cacheKey: string,
-    entityType: string,
-    options?: RequestOptions
-  ): Promise<{ data: T; fromCache: boolean }> {
-    if (this.cache) {
-      const cached = this.cache.get<T>(cacheKey);
-      if (cached) {
-        if (cached.etag) {
-          const headers = { ...options?.headers, "If-None-Match": cached.etag };
-          const resp = await this.rest.request<T>(path, { ...options, method: "GET", headers });
-          if (resp.status === 304) {
-            return { data: cached.data, fromCache: true };
-          }
-          this.cache.set(cacheKey, resp.data, entityType, resp.etag);
-          return { data: resp.data, fromCache: false };
-        }
-        return { data: cached.data, fromCache: true };
-      }
+    if (cache) {
+      this.installCacheHook(cache);
     }
-
-    const resp = await this.rest.request<T>(path, { ...options, method: "GET" });
-    this.cache?.set(cacheKey, resp.data, entityType, resp.etag);
-    return { data: resp.data, fromCache: false };
   }
 
-  async post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<RestResponse<T>> {
-    return this.rest.request<T>(path, { ...options, method: "POST", body });
-  }
+  private installCacheHook(cache: Cache): void {
+    this.octokit.hook.wrap("request", async (request, options) => {
+      const method = options.method;
+      const url = options.url;
 
-  async patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<RestResponse<T>> {
-    return this.rest.request<T>(path, { ...options, method: "PATCH", body });
-  }
+      if (method !== "GET") {
+        const response = await request(options);
+        cache.invalidateForWrite(url);
+        return response;
+      }
 
-  async put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<RestResponse<T>> {
-    return this.rest.request<T>(path, { ...options, method: "PUT", body });
-  }
+      const cached = cache.getEntry(url);
+      if (cached?.etag) {
+        options.headers = { ...options.headers, "if-none-match": cached.etag };
+      }
 
-  async delete<T>(path: string, options?: RequestOptions): Promise<RestResponse<T>> {
-    return this.rest.request<T>(path, { ...options, method: "DELETE" });
+      try {
+        const response = await request(options);
+        const etag = (response.headers as Record<string, string>).etag;
+        cache.setEntry(url, response, etag);
+        return response;
+      } catch (error: unknown) {
+        if (isNotModified(error) && cached) {
+          return cached.response as ReturnType<typeof request> extends Promise<infer R> ? R : never;
+        }
+        throw error;
+      }
+    });
   }
+}
 
-  async paginate<T>(path: string, options?: RequestOptions, maxPages?: number): Promise<T[]> {
-    return this.rest.paginate<T>(path, options, maxPages);
-  }
-
-  async gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-    return this.graphql.query<T>(query, variables);
-  }
-
-  async gqlPaginate<TNode, TResult>(
-    queryFn: (cursor: string | null) => { query: string; variables: Record<string, unknown> },
-    extractConnection: (data: TResult) => { nodes: TNode[]; pageInfo: PageInfo },
-    maxPages?: number
-  ): Promise<TNode[]> {
-    return this.graphql.paginateQuery<TNode, TResult>(queryFn, extractConnection, maxPages);
-  }
-
-  async getRaw(path: string, options?: RequestOptions): Promise<Response> {
-    return this.rest.requestRaw(path, options);
-  }
+function isNotModified(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    (error as { status: number }).status === 304
+  );
 }
