@@ -1,3 +1,4 @@
+import { ProxyAgent, Agent, type Dispatcher } from "undici";
 import type { Config } from "../config.js";
 import type { RestResponse, RequestOptions, RateLimitInfo } from "./types.js";
 import { RateLimiter } from "./rate-limiter.js";
@@ -8,8 +9,7 @@ export class RestClient {
   private timeout: number;
   private maxRetries: number;
   private rateLimiter: RateLimiter;
-  private proxyAgent: unknown;
-  private insecure: boolean;
+  private dispatcher: Dispatcher | undefined;
 
   constructor(config: Config, rateLimiter: RateLimiter) {
     this.baseUrl = config.apiUrl.replace(/\/+$/, "");
@@ -17,20 +17,26 @@ export class RestClient {
     this.timeout = config.requestTimeout;
     this.maxRetries = config.maxRetries;
     this.rateLimiter = rateLimiter;
-    this.insecure = config.insecure;
-    if (config.proxyUrl) {
-      this.initProxy(config.proxyUrl);
-    }
+    this.dispatcher = this.createDispatcher(config);
   }
 
-  private async initProxy(proxyUrl: string): Promise<void> {
-    try {
-      // undici ships with Node 18+ but lacks ambient types; dynamic import with type assertion
-      const undici = await (import("undici" as string) as Promise<{ ProxyAgent: new (url: string) => unknown }>);
-      this.proxyAgent = new undici.ProxyAgent(proxyUrl);
-    } catch {
-      process.stderr.write(`Warning: Failed to initialize proxy agent for ${proxyUrl}\n`);
+  private createDispatcher(config: Config): Dispatcher | undefined {
+    const tlsOptions = config.insecure
+      ? { rejectUnauthorized: false }
+      : undefined;
+
+    if (config.proxyUrl) {
+      return new ProxyAgent({
+        uri: config.proxyUrl,
+        ...(tlsOptions && { requestTls: tlsOptions }),
+      });
     }
+
+    if (tlsOptions) {
+      return new Agent({ connect: tlsOptions });
+    }
+
+    return undefined;
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<RestResponse<T>> {
@@ -53,22 +59,18 @@ export class RestClient {
       await this.rateLimiter.acquire();
 
       try {
-        const fetchOptions: globalThis.RequestInit = {
+        const fetchOptions: Record<string, unknown> = {
           method,
           headers,
           body: options.body ? JSON.stringify(options.body) : undefined,
           signal: AbortSignal.timeout(options.timeout ?? this.timeout),
         };
 
-        if (this.proxyAgent) {
-          (fetchOptions as Record<string, unknown>).dispatcher = this.proxyAgent;
+        if (this.dispatcher) {
+          fetchOptions.dispatcher = this.dispatcher;
         }
 
-        if (this.insecure) {
-          (fetchOptions as Record<string, unknown>).rejectUnauthorized = false;
-        }
-
-        const response = await fetch(url, fetchOptions);
+        const response = await fetch(url, fetchOptions as RequestInit);
 
         this.updateRateLimitFromHeaders(response.headers);
 
@@ -125,18 +127,18 @@ export class RestClient {
 
     await this.rateLimiter.acquire();
 
-    const fetchOptions: globalThis.RequestInit = {
+    const fetchOptions: Record<string, unknown> = {
       method,
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
       signal: AbortSignal.timeout(options.timeout ?? this.timeout),
     };
 
-    if (this.proxyAgent) {
-      (fetchOptions as Record<string, unknown>).dispatcher = this.proxyAgent;
+    if (this.dispatcher) {
+      fetchOptions.dispatcher = this.dispatcher;
     }
 
-    return fetch(url, fetchOptions);
+    return fetch(url, fetchOptions as RequestInit);
   }
 
   async paginate<T>(path: string, options: RequestOptions = {}, maxPages = 10): Promise<T[]> {
