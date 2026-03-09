@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerGitDataTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -26,7 +26,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
       ...(params.recursive ? { recursive: "1" as const } : {}),
     });
     const out = { tree: data.tree, truncated: data.truncated };
-    return { content: [{ type: "text" as const, text: toonFormat(out) }] };
+    return content(out);
   });
 
   server.registerTool("get_ref", {
@@ -44,7 +44,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
       repo,
       ref: params.ref,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 
   if (isGateEnabled("write", config)) {
@@ -72,7 +72,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
         repo,
         ...body,
       });
-      return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+      return content(data);
     });
 
     server.registerTool("create_commit_object", {
@@ -100,7 +100,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
         parents: params.parents,
         author: params.author,
       });
-      return { content: [{ type: "text" as const, text: toonFormat({ sha: data.sha, message: params.message }) }] };
+      return content({ sha: data.sha, message: params.message });
     });
   }
 }

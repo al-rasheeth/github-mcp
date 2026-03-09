@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerPullRequestTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -33,7 +33,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       direction: params.direction,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(prs) }] };
+    return content(prs);
   });
 
   server.registerTool("get_pull_request", {
@@ -47,7 +47,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.pulls.get({ owner, repo, pull_number: params.pull_number });
-    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+    return content(resp.data);
   });
 
   if (isGateEnabled("write", config)) {
@@ -74,7 +74,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         base: params.base,
         draft: params.draft,
       });
-      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+      return content(resp.data);
     });
 
     server.registerTool("update_pull_request", {
@@ -101,7 +101,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         state,
         base,
       });
-      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+      return content(resp.data);
     });
 
     server.registerTool("merge_pull_request", {
@@ -125,7 +125,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         commit_title: params.commit_title,
         commit_message: params.commit_message,
       });
-      return { content: [{ type: "text" as const, text: `PR #${params.pull_number} merged via ${params.merge_method}.\nSHA: \`${resp.data.sha}\`\nMessage: ${resp.data.message}` }] };
+      return content({ pull_number: params.pull_number, merge_method: params.merge_method, sha: resp.data.sha, message: resp.data.message });
     });
 
     server.registerTool("create_pr_review", {
@@ -154,7 +154,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         body: params.body,
         comments: params.comments,
       });
-      return { content: [{ type: "text" as const, text: `Review submitted: ${params.event}\nURL: ${(resp.data as Record<string, unknown>).html_url}` }] };
+      return content({ event: params.event, url: (resp.data as Record<string, unknown>).html_url });
     });
 
     server.registerTool("request_reviewers", {
@@ -177,7 +177,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         team_reviewers: params.team_reviewers,
       });
       const requested = [...(params.reviewers ?? []), ...(params.team_reviewers ?? [])].join(", ");
-      return { content: [{ type: "text" as const, text: `Reviewers requested on PR #${params.pull_number}: ${requested}` }] };
+      return content({ pull_number: params.pull_number, reviewers: requested });
     });
   }
 
@@ -198,7 +198,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       pull_number: params.pull_number,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(commits) }] };
+    return content(commits);
   });
 
   server.registerTool("list_pr_files", {
@@ -218,7 +218,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       pull_number: params.pull_number,
       per_page: params.per_page,
     });
-    if (files.length === 0) return { content: [{ type: "text" as const, text: "No files changed." }] };
+    if (files.length === 0) return content({ files: [] });
 
     const lines = ["| File | Status | Changes |", "| --- | --- | --- |"];
     for (const f of files as Record<string, unknown>[]) {
@@ -244,7 +244,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       mediaType: { format: "diff" },
     });
     const diff = response.data as unknown as string;
-    return { content: [{ type: "text" as const, text: `\`\`\`diff\n${diff}\n\`\`\`` }] };
+    return content({ diff });
   });
 
   server.registerTool("list_pr_reviews", {
@@ -262,8 +262,8 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       repo,
       pull_number: params.pull_number,
     });
-    if (reviews.length === 0) return { content: [{ type: "text" as const, text: "No reviews yet." }] };
-    return { content: [{ type: "text" as const, text: toonFormat(reviews) }] };
+    if (reviews.length === 0) return content({ reviews: [] });
+    return content(reviews);
   });
 
   server.registerTool("list_pr_review_comments", {
@@ -283,8 +283,8 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       pull_number: params.pull_number,
       per_page: params.per_page,
     });
-    if (comments.length === 0) return { content: [{ type: "text" as const, text: "No review comments." }] };
-    return { content: [{ type: "text" as const, text: toonFormat(comments) }] };
+    if (comments.length === 0) return content({ comments: [] });
+    return content(comments);
   });
 
   server.registerTool("list_pr_checks", {
@@ -316,6 +316,6 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       check_runs: checksResp.data.check_runs,
       statuses: statusResp.data.statuses,
     };
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 }

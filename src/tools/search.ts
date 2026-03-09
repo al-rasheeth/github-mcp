@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { READ_ANNOTATION } from "./registry.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
   const { client } = ctx;
@@ -23,9 +23,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       order: params.order,
       per_page: params.per_page,
     });
-    return {
-      content: [{ type: "text" as const, text: toonFormat({ total_count: data.total_count, items: data.items }) }],
-    };
+    return content({ total_count: data.total_count, items: data.items });
   });
 
   server.registerTool("search_repos", {
@@ -44,9 +42,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       order: params.order,
       per_page: params.per_page,
     });
-    return {
-      content: [{ type: "text" as const, text: toonFormat({ total_count: data.total_count, items: data.items }) }],
-    };
+    return content({ total_count: data.total_count, items: data.items });
   });
 
   server.registerTool("search_users", {
@@ -65,9 +61,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       order: params.order,
       per_page: params.per_page,
     });
-    return {
-      content: [{ type: "text" as const, text: toonFormat({ total_count: data.total_count, items: data.items }) }],
-    };
+    return content({ total_count: data.total_count, items: data.items });
   });
 
   server.registerTool("search_commits", {
@@ -86,8 +80,6 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       order: params.order,
       per_page: params.per_page,
     });
-    return {
-      content: [{ type: "text" as const, text: toonFormat({ total_count: data.total_count, items: data.items }) }],
-    };
+    return content({ total_count: data.total_count, items: data.items });
   });
 }

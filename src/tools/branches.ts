@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION, DESTRUCTIVE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -25,7 +25,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
       protected: params.protected,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(branches) }] };
+    return content(branches);
   });
 
   server.registerTool("get_branch", {
@@ -39,7 +39,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.repos.getBranch({ owner, repo, branch: params.branch });
-    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+    return content(resp.data);
   });
 
   if (isGateEnabled("write", config)) {
@@ -82,7 +82,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
         ref: `refs/heads/${params.branch}`,
         sha: sha!,
       });
-      return { content: [{ type: "text" as const, text: `Branch \`${params.branch}\` created from \`${sha?.slice(0, 7)}\`` }] };
+      return content({ branch: params.branch, from_sha: sha?.slice(0, 7) });
     });
   }
 
@@ -98,7 +98,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
     }, async (params) => {
       const { owner, repo } = withDefaults(params, config);
       await client.octokit.rest.git.deleteRef({ owner, repo, ref: `heads/${params.branch}` });
-      return { content: [{ type: "text" as const, text: `Branch \`${params.branch}\` deleted from ${owner}/${repo}.` }] };
+      return content({ message: `Branch ${params.branch} deleted from ${owner}/${repo}` });
     });
   }
 
@@ -114,9 +114,9 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
     const { owner, repo } = withDefaults(params, config);
     try {
       const resp = await client.octokit.rest.repos.getBranchProtection({ owner, repo, branch: params.branch });
-      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+      return content(resp.data);
     } catch {
-      return { content: [{ type: "text" as const, text: toonFormat({ branch: params.branch, protection: "none" }) }] };
+      return content({ branch: params.branch, protection: "none" });
     }
   });
 
@@ -137,6 +137,6 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
       base: params.base,
       head: params.head,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+    return content(resp.data);
   });
 }

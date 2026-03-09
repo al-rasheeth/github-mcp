@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { READ_ANNOTATION } from "./registry.js";
 import { withOwnerDefault } from "../utils/helpers.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -24,8 +24,8 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
 
-    if (members.length === 0) return { content: [{ type: "text" as const, text: "No members found." }] };
-    return { content: [{ type: "text" as const, text: toonFormat(members) }] };
+    if (members.length === 0) return content({ members: [] });
+    return content(members);
   });
 
   server.registerTool("list_org_repos", {
@@ -47,7 +47,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
       direction: params.direction,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(repos) }] };
+    return content(repos);
   });
 
   server.registerTool("list_teams", {
@@ -64,7 +64,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
 
-    if (teams.length === 0) return { content: [{ type: "text" as const, text: "No teams found." }] };
-    return { content: [{ type: "text" as const, text: toonFormat(teams) }] };
+    if (teams.length === 0) return content({ teams: [] });
+    return content(teams);
   });
 }

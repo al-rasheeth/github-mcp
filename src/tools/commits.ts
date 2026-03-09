@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { READ_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -33,7 +33,7 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
       until: params.until,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(commits) }] };
+    return content(commits);
   });
 
   server.registerTool("get_commit", {
@@ -47,7 +47,7 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const { data } = await client.octokit.rest.repos.getCommit({ owner, repo, ref: params.ref });
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 
   server.registerTool("compare_commits", {
@@ -67,6 +67,6 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
       base: params.base,
       head: params.head,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 }

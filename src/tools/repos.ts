@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION, DESTRUCTIVE_ANNOTATION } from "./registry.js";
 import { withDefaults, decodeBase64 } from "../utils/helpers.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -29,7 +29,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
         type: params.type as "all" | "owner" | "public" | "private" | "member" | undefined, sort: params.sort, direction: params.direction, per_page: params.per_page,
       });
     }
-    return { content: [{ type: "text" as const, text: toonFormat(repos) }] };
+    return content(repos);
   });
 
   server.registerTool("get_repo", {
@@ -42,7 +42,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.repos.get({ owner, repo });
-    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+    return content(resp.data);
   });
 
   if (isGateEnabled("write", config)) {
@@ -67,7 +67,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
         const resp = await client.octokit.rest.repos.createForAuthenticatedUser({ name: params.name, description: params.description, private: params.private, auto_init: params.auto_init, gitignore_template: params.gitignore_template, license_template: params.license_template });
         data = resp.data;
       }
-      return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+      return content(data);
     });
 
     server.registerTool("update_repo", {
@@ -88,7 +88,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
     }, async (params) => {
       const { owner, repo } = withDefaults(params, config);
       const resp = await client.octokit.rest.repos.update({ owner, repo, description: params.description, homepage: params.homepage, private: params.private, has_issues: params.has_issues, has_projects: params.has_projects, has_wiki: params.has_wiki, default_branch: params.default_branch, archived: params.archived });
-      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+      return content(resp.data);
     });
 
     server.registerTool("create_or_update_file", {
@@ -110,7 +110,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
         content: Buffer.from(params.content).toString("base64"),
         branch: params.branch, sha: params.sha,
       });
-      return { content: [{ type: "text" as const, text: `File committed: \`${params.path}\`\nSHA: \`${resp.data.commit.sha}\`\nMessage: ${params.message}` }] };
+      return content({ path: params.path, sha: resp.data.commit.sha, message: params.message });
     });
   }
 
@@ -124,10 +124,10 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       },
       annotations: DESTRUCTIVE_ANNOTATION,
     }, async (params) => {
-      if (!params.confirm) return { content: [{ type: "text" as const, text: "Deletion not confirmed. Set `confirm: true` to proceed." }] };
+      if (!params.confirm) return content({ error: "Deletion not confirmed. Set confirm: true to proceed." });
       const { owner, repo } = withDefaults(params, config);
       await client.octokit.rest.repos.delete({ owner, repo });
-      return { content: [{ type: "text" as const, text: `Repository ${owner}/${repo} has been deleted.` }] };
+      return content({ message: `Repository ${owner}/${repo} has been deleted.` });
     });
   }
 
@@ -139,8 +139,8 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.repos.getAllTopics({ owner, repo });
     const topics = resp.data.names;
-    if (topics.length === 0) return { content: [{ type: "text" as const, text: toonFormat({ topics: [] }) }] };
-    return { content: [{ type: "text" as const, text: toonFormat({ topics }) }] };
+    if (topics.length === 0) return content({ topics: [] });
+    return content({ topics });
   });
 
   server.registerTool("list_languages", {
@@ -150,8 +150,8 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.repos.listLanguages({ owner, repo });
-    if (Object.keys(resp.data).length === 0) return { content: [{ type: "text" as const, text: toonFormat({ languages: {} }) }] };
-    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+    if (Object.keys(resp.data).length === 0) return content({ languages: {} });
+    return content(resp.data);
   });
 
   server.registerTool("list_contributors", {
@@ -161,8 +161,8 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.repos.listContributors({ owner, repo, per_page: params.per_page });
-    if (!resp.data.length) return { content: [{ type: "text" as const, text: toonFormat({ contributors: [] }) }] };
-    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
+    if (!resp.data.length) return content({ contributors: [] });
+    return content(resp.data);
   });
 
   server.registerTool("get_readme", {
@@ -172,8 +172,8 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.repos.getReadme({ owner, repo, ref: params.ref });
-    const content = decodeBase64((resp.data as unknown as { content: string }).content);
-    return { content: [{ type: "text" as const, text: toonFormat({ path: resp.data.name, content }) }] };
+    const text = decodeBase64((resp.data as unknown as { content: string }).content);
+    return content({ path: resp.data.name, content: text });
   });
 
   server.registerTool("get_file_contents", {
@@ -185,12 +185,12 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
     const resp = await client.octokit.rest.repos.getContent({ owner, repo, path: params.path, ref: params.ref });
     const data = resp.data;
     if (Array.isArray(data)) {
-      return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+      return content(data);
     }
     if (data.type === "file" && "content" in data && data.content) {
       const decoded = decodeBase64(data.content);
-      return { content: [{ type: "text" as const, text: toonFormat({ path: params.path, content: decoded }) }] };
+      return content({ path: params.path, content: decoded });
     }
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 }

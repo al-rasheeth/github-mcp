@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerReleaseTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -23,8 +23,8 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       repo,
       per_page: params.per_page,
     });
-    if (releases.length === 0) return { content: [{ type: "text" as const, text: "No releases found." }] };
-    return { content: [{ type: "text" as const, text: toonFormat(releases) }] };
+    if (releases.length === 0) return content({ releases: [] });
+    return content(releases);
   });
 
   server.registerTool("get_release", {
@@ -49,7 +49,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       const resp = await client.octokit.rest.repos.getLatestRelease({ owner, repo });
       data = resp.data;
     }
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 
   if (isGateEnabled("write", config)) {
@@ -80,7 +80,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
         target_commitish: params.target_commitish,
         generate_release_notes: params.generate_release_notes,
       });
-      return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+      return content(data);
     });
   }
 
@@ -99,8 +99,8 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       repo,
       per_page: params.per_page,
     });
-    if (tags.length === 0) return { content: [{ type: "text" as const, text: "No tags found." }] };
-    return { content: [{ type: "text" as const, text: toonFormat(tags) }] };
+    if (tags.length === 0) return content({ tags: [] });
+    return content(tags);
   });
 
   server.registerTool("generate_release_notes", {
@@ -122,6 +122,6 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       target_commitish: params.target_commitish,
       previous_tag_name: params.previous_tag_name,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 }

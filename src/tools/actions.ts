@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerActionTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -26,8 +26,8 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
     const workflows = data.workflows;
-    if (workflows.length === 0) return { content: [{ type: "text" as const, text: toonFormat({ workflows: [] }) }] };
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    if (workflows.length === 0) return content({ workflows: [] });
+    return content(data);
   });
 
   server.registerTool("list_workflow_runs", {
@@ -67,8 +67,8 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       });
       runs = data.workflow_runs as Array<Record<string, unknown>>;
     }
-    if (runs.length === 0) return { content: [{ type: "text" as const, text: toonFormat({ workflow_runs: [] }) }] };
-    return { content: [{ type: "text" as const, text: toonFormat({ workflow_runs: runs }) }] };
+    if (runs.length === 0) return content({ workflow_runs: [] });
+    return content({ workflow_runs: runs });
   });
 
   server.registerTool("get_workflow_run", {
@@ -86,7 +86,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       repo,
       run_id: params.run_id,
     });
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 
   server.registerTool("list_workflow_run_jobs", {
@@ -107,8 +107,8 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       filter: params.filter,
     });
     const jobs = data.jobs;
-    if (jobs.length === 0) return { content: [{ type: "text" as const, text: toonFormat({ jobs: [] }) }] };
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    if (jobs.length === 0) return content({ jobs: [] });
+    return content(data);
   });
 
   server.registerTool("get_workflow_run_logs", {
@@ -128,9 +128,9 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
         run_id: params.run_id,
         filter: "latest",
       });
-      return { content: [{ type: "text" as const, text: toonFormat({ run_id: params.run_id, jobs: data.jobs }) }] };
+      return content({ run_id: params.run_id, jobs: data.jobs });
     } catch {
-      return { content: [{ type: "text" as const, text: `Failed to fetch logs for run ${params.run_id}. Logs may have expired (kept for 90 days).` }] };
+      return content({ error: "Logs may have expired (kept for 90 days)", run_id: params.run_id });
     }
   });
 
@@ -153,7 +153,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       ref: params.ref,
       inputs: params.inputs,
     });
-    return { content: [{ type: "text" as const, text: `Workflow \`${params.workflow_id}\` triggered on \`${params.ref}\`.` }] };
+    return content({ workflow_id: params.workflow_id, ref: params.ref, message: "Workflow triggered" });
   });
 
   server.registerTool("cancel_workflow_run", {
@@ -171,7 +171,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       repo,
       run_id: params.run_id,
     });
-    return { content: [{ type: "text" as const, text: `Workflow run #${params.run_id} cancellation requested.` }] };
+    return content({ run_id: params.run_id, message: "Cancellation requested" });
   });
 
   server.registerTool("rerun_workflow", {
@@ -191,6 +191,6 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       run_id: params.run_id,
       enable_debug_logging: params.enable_debug_logging,
     });
-    return { content: [{ type: "text" as const, text: `Workflow run #${params.run_id} re-run triggered.` }] };
+    return content({ run_id: params.run_id, message: "Re-run triggered" });
   });
 }

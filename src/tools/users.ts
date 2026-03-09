@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
-import { toonFormat } from "../utils/toon.js";
+import { content } from "../utils/toon.js";
 
 export function registerUserTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -13,7 +13,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
     annotations: READ_ANNOTATION,
   }, async () => {
     const { data } = await client.octokit.rest.users.getAuthenticated();
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 
   server.registerTool("get_user", {
@@ -24,7 +24,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
     annotations: READ_ANNOTATION,
   }, async (params) => {
     const { data } = await client.octokit.rest.users.getByUsername({ username: params.username });
-    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+    return content(data);
   });
 
   server.registerTool("list_notifications", {
@@ -46,7 +46,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
         per_page: params.per_page,
       }
     );
-    return { content: [{ type: "text" as const, text: toonFormat(notifications) }] };
+    return content(notifications);
   });
 
   if (isGateEnabled("write", config)) {
@@ -60,7 +60,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
       await client.octokit.rest.activity.markNotificationsAsRead(
         params.last_read_at ? { last_read_at: params.last_read_at } : {}
       );
-      return { content: [{ type: "text" as const, text: "All notifications marked as read." }] };
+      return content({ message: "All notifications marked as read" });
     });
   }
 }

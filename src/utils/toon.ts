@@ -25,3 +25,13 @@ function trim(value: unknown, depth = 0): unknown {
 export function toonFormat(data: unknown): string {
   return encode(trim(data));
 }
+
+/** Standard MCP tool result: TOON-encoded content. Use for all tool returns. */
+export function content(data: unknown): { content: [{ type: "text"; text: string }] } {
+  return { content: [{ type: "text" as const, text: toonFormat(data) }] };
+}
+
+/** Standard MCP resource result: TOON-encoded content with uri. */
+export function resourceContent(uri: string, data: unknown): { contents: [{ uri: string; text: string; mimeType: string }] } {
+  return { contents: [{ uri, text: toonFormat(data), mimeType: "text/plain" }] };
+}
