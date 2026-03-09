@@ -2,8 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
-import { withDefaults, formatDate } from "../utils/helpers.js";
-import { formatWorkflowRun } from "../utils/markdown.js";
+import { withDefaults } from "../utils/helpers.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerActionTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -26,13 +26,8 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
     const workflows = data.workflows;
-    if (workflows.length === 0) return { content: [{ type: "text" as const, text: "No workflows found." }] };
-
-    const lines = ["| ID | Name | State | Path |", "| --- | --- | --- | --- |"];
-    for (const w of workflows as Record<string, unknown>[]) {
-      lines.push(`| ${w.id} | ${w.name} | ${w.state} | \`${w.path}\` |`);
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    if (workflows.length === 0) return { content: [{ type: "text" as const, text: toonFormat({ workflows: [] }) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 
   server.registerTool("list_workflow_runs", {
@@ -72,15 +67,8 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       });
       runs = data.workflow_runs as Array<Record<string, unknown>>;
     }
-    if (runs.length === 0) return { content: [{ type: "text" as const, text: "No workflow runs found." }] };
-
-    const lines = ["| # | Workflow | Status | Conclusion | Branch | Event | Updated |", "| --- | --- | --- | --- | --- | --- | --- |"];
-    for (const r of runs) {
-      lines.push(
-        `| #${r.run_number} | ${r.name} | ${r.status} | ${r.conclusion ?? "pending"} | \`${r.head_branch}\` | ${r.event} | ${formatDate(r.updated_at as string)} |`
-      );
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    if (runs.length === 0) return { content: [{ type: "text" as const, text: toonFormat({ workflow_runs: [] }) }] };
+    return { content: [{ type: "text" as const, text: toonFormat({ workflow_runs: runs }) }] };
   });
 
   server.registerTool("get_workflow_run", {
@@ -98,7 +86,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       repo,
       run_id: params.run_id,
     });
-    return { content: [{ type: "text" as const, text: formatWorkflowRun(data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 
   server.registerTool("list_workflow_run_jobs", {
@@ -119,26 +107,8 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
       filter: params.filter,
     });
     const jobs = data.jobs;
-    if (jobs.length === 0) return { content: [{ type: "text" as const, text: "No jobs found." }] };
-
-    const lines: string[] = [];
-    for (const job of jobs as Record<string, unknown>[]) {
-      lines.push(
-        `## ${job.name}`,
-        "",
-        `**Status:** ${job.status} | **Conclusion:** ${job.conclusion ?? "pending"} | **Runner:** ${job.runner_name ?? "N/A"}`,
-        ""
-      );
-      const steps = job.steps as Array<Record<string, unknown>> | undefined;
-      if (steps?.length) {
-        lines.push("| # | Step | Status | Conclusion |", "| --- | --- | --- | --- |");
-        for (const s of steps) {
-          lines.push(`| ${s.number} | ${s.name} | ${s.status} | ${s.conclusion ?? "pending"} |`);
-        }
-        lines.push("");
-      }
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    if (jobs.length === 0) return { content: [{ type: "text" as const, text: toonFormat({ jobs: [] }) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 
   server.registerTool("get_workflow_run_logs", {
@@ -158,22 +128,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
         run_id: params.run_id,
         filter: "latest",
       });
-      const jobs = data.jobs;
-      const lines: string[] = [`# Logs for Run #${params.run_id}`, ""];
-
-      for (const job of jobs as Record<string, unknown>[]) {
-        lines.push(`## ${job.name} (${job.conclusion ?? job.status})`, "");
-        const steps = job.steps as Array<Record<string, unknown>> | undefined;
-        if (steps?.length) {
-          for (const step of steps) {
-            const icon = step.conclusion === "success" ? "+" : step.conclusion === "failure" ? "x" : "-";
-            lines.push(`[${icon}] Step ${step.number}: ${step.name} (${step.conclusion ?? step.status})`);
-          }
-        }
-        lines.push("");
-      }
-
-      return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+      return { content: [{ type: "text" as const, text: toonFormat({ run_id: params.run_id, jobs: data.jobs }) }] };
     } catch {
       return { content: [{ type: "text" as const, text: `Failed to fetch logs for run ${params.run_id}. Logs may have expired (kept for 90 days).` }] };
     }

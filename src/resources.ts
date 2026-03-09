@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GitHubClient } from "./github/client.js";
-import { formatUser, formatRepoList, formatNotificationList, formatRepo, formatIssueList } from "./utils/markdown.js";
+import { toonFormat } from "./utils/toon.js";
 
 export function registerResources(server: McpServer, client: GitHubClient): void {
   server.registerResource("user-profile", "github://user", {
@@ -9,7 +9,7 @@ export function registerResources(server: McpServer, client: GitHubClient): void
     mimeType: "text/markdown",
   }, async (uri) => {
     const { data } = await client.octokit.rest.users.getAuthenticated();
-    return { contents: [{ uri: uri.href, text: formatUser(data as Record<string, unknown>), mimeType: "text/markdown" }] };
+    return { contents: [{ uri: uri.href, text: toonFormat(data), mimeType: "text/plain" }] };
   });
 
   server.registerResource("user-repos", "github://repos", {
@@ -17,7 +17,7 @@ export function registerResources(server: McpServer, client: GitHubClient): void
     mimeType: "text/markdown",
   }, async (uri) => {
     const repos = await client.octokit.paginate(client.octokit.rest.repos.listForAuthenticatedUser, { per_page: 100, sort: "updated" });
-    return { contents: [{ uri: uri.href, text: formatRepoList(repos as Record<string, unknown>[]), mimeType: "text/markdown" }] };
+    return { contents: [{ uri: uri.href, text: toonFormat(repos), mimeType: "text/plain" }] };
   });
 
   server.registerResource("notifications", "github://notifications", {
@@ -25,7 +25,7 @@ export function registerResources(server: McpServer, client: GitHubClient): void
     mimeType: "text/markdown",
   }, async (uri) => {
     const notifications = await client.octokit.paginate(client.octokit.rest.activity.listNotificationsForAuthenticatedUser, { per_page: 50 });
-    return { contents: [{ uri: uri.href, text: formatNotificationList(notifications as Record<string, unknown>[]), mimeType: "text/markdown" }] };
+    return { contents: [{ uri: uri.href, text: toonFormat(notifications), mimeType: "text/plain" }] };
   });
 
   server.registerResource("repo-detail", new ResourceTemplate("github://repo/{owner}/{repo}", { list: undefined }), {
@@ -35,7 +35,7 @@ export function registerResources(server: McpServer, client: GitHubClient): void
     const owner = Array.isArray(variables.owner) ? variables.owner[0] : variables.owner;
     const repo = Array.isArray(variables.repo) ? variables.repo[0] : variables.repo;
     const { data } = await client.octokit.rest.repos.get({ owner, repo });
-    return { contents: [{ uri: uri.href, text: formatRepo(data as Record<string, unknown>), mimeType: "text/markdown" }] };
+    return { contents: [{ uri: uri.href, text: toonFormat(data), mimeType: "text/plain" }] };
   });
 
   server.registerResource("repo-issues", new ResourceTemplate("github://repo/{owner}/{repo}/issues", { list: undefined }), {
@@ -46,6 +46,6 @@ export function registerResources(server: McpServer, client: GitHubClient): void
     const repo = Array.isArray(variables.repo) ? variables.repo[0] : variables.repo;
     const issues = await client.octokit.paginate(client.octokit.rest.issues.listForRepo, { owner, repo, state: "open", per_page: 30 });
     const filtered = issues.filter((i) => !i.pull_request);
-    return { contents: [{ uri: uri.href, text: formatIssueList(filtered as Record<string, unknown>[]), mimeType: "text/markdown" }] };
+    return { contents: [{ uri: uri.href, text: toonFormat(filtered), mimeType: "text/plain" }] };
   });
 }

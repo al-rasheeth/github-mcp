@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { READ_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { formatCommit, formatCommitList } from "../utils/markdown.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -33,7 +33,7 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
       until: params.until,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: formatCommitList(commits as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(commits) }] };
   });
 
   server.registerTool("get_commit", {
@@ -47,7 +47,7 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const { data } = await client.octokit.rest.repos.getCommit({ owner, repo, ref: params.ref });
-    return { content: [{ type: "text" as const, text: formatCommit(data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 
   server.registerTool("compare_commits", {
@@ -67,30 +67,6 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
       base: params.base,
       head: params.head,
     });
-    const lines = [
-      `# Compare \`${params.base}\` ← \`${params.head}\``,
-      "",
-      "| Metric | Value |",
-      "| --- | --- |",
-      `| **Status** | ${data.status} |`,
-      `| **Ahead by** | ${data.ahead_by} commits |`,
-      `| **Behind by** | ${data.behind_by} commits |`,
-      `| **Total commits** | ${data.total_commits} |`,
-    ];
-
-    const commits = data.commits as Array<Record<string, unknown>> | undefined;
-    if (commits?.length) {
-      lines.push("", "## Commits", "", formatCommitList(commits));
-    }
-
-    const files = data.files as Array<Record<string, unknown>> | undefined;
-    if (files?.length) {
-      lines.push("", "## Changed Files", "", "| File | Status | Changes |", "| --- | --- | --- |");
-      for (const f of files) {
-        lines.push(`| \`${f.filename}\` | ${f.status} | +${f.additions}/-${f.deletions} |`);
-      }
-    }
-
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 }

@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { formatIssue, formatIssueList, formatCommentList, formatMilestoneList, formatSearchResults } from "../utils/markdown.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -25,7 +25,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
     const items = resp.data.items as Record<string, unknown>[];
-    return { content: [{ type: "text" as const, text: formatSearchResults(items, "issues", resp.data.total_count) }] };
+    return { content: [{ type: "text" as const, text: toonFormat({ total_count: resp.data.total_count, items }) }] };
   });
 
   server.registerTool("list_issues", {
@@ -56,7 +56,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
     const filtered = issues.filter((i) => !(i as Record<string, unknown>).pull_request);
-    return { content: [{ type: "text" as const, text: formatIssueList(filtered as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(filtered) }] };
   });
 
   server.registerTool("get_issue", {
@@ -70,7 +70,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.issues.get({ owner, repo, issue_number: params.issue_number });
-    return { content: [{ type: "text" as const, text: formatIssue(resp.data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
   });
 
   if (isGateEnabled("write", config)) {
@@ -97,7 +97,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         assignees: params.assignees,
         milestone: params.milestone,
       });
-      return { content: [{ type: "text" as const, text: formatIssue(resp.data as Record<string, unknown>) }] };
+      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
     });
 
     server.registerTool("update_issue", {
@@ -127,7 +127,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         assignees: params.assignees,
         milestone: params.milestone ?? undefined,
       });
-      return { content: [{ type: "text" as const, text: formatIssue(resp.data as Record<string, unknown>) }] };
+      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
     });
 
     server.registerTool("add_issue_comment", {
@@ -229,7 +229,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       issue_number: params.issue_number,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: formatCommentList(comments as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(comments) }] };
   });
 
   server.registerTool("list_milestones", {
@@ -251,6 +251,6 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       sort: params.sort,
       direction: params.direction,
     });
-    return { content: [{ type: "text" as const, text: formatMilestoneList(milestones as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(milestones) }] };
   });
 }

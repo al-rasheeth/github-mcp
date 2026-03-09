@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION, DESTRUCTIVE_ANNOTATION } from "./registry.js";
 import { withDefaults } from "../utils/helpers.js";
-import { formatBranch, formatBranchList } from "../utils/markdown.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -25,7 +25,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
       protected: params.protected,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: formatBranchList(branches as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(branches) }] };
   });
 
   server.registerTool("get_branch", {
@@ -39,7 +39,7 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.repos.getBranch({ owner, repo, branch: params.branch });
-    return { content: [{ type: "text" as const, text: formatBranch(resp.data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
   });
 
   if (isGateEnabled("write", config)) {
@@ -114,33 +114,9 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
     const { owner, repo } = withDefaults(params, config);
     try {
       const resp = await client.octokit.rest.repos.getBranchProtection({ owner, repo, branch: params.branch });
-      const prot = resp.data as Record<string, unknown>;
-
-      const lines = [
-        `# Branch Protection: \`${params.branch}\``,
-        "",
-        "| Rule | Value |",
-        "| --- | --- |",
-      ];
-
-      const reqReviews = prot.required_pull_request_reviews as Record<string, unknown> | undefined;
-      if (reqReviews) {
-        lines.push(`| **Required reviews** | ${reqReviews.required_approving_review_count ?? "Yes"} |`);
-        lines.push(`| **Dismiss stale reviews** | ${reqReviews.dismiss_stale_reviews ?? false} |`);
-      }
-      const reqChecks = prot.required_status_checks as Record<string, unknown> | undefined;
-      if (reqChecks) {
-        lines.push(`| **Strict status checks** | ${reqChecks.strict ?? false} |`);
-        const contexts = reqChecks.contexts as string[] | undefined;
-        if (contexts?.length) lines.push(`| **Required checks** | ${contexts.join(", ")} |`);
-      }
-      lines.push(`| **Enforce admins** | ${(prot.enforce_admins as Record<string, unknown>)?.enabled ?? false} |`);
-      lines.push(`| **Allow force pushes** | ${(prot.allow_force_pushes as Record<string, unknown>)?.enabled ?? false} |`);
-      lines.push(`| **Allow deletions** | ${(prot.allow_deletions as Record<string, unknown>)?.enabled ?? false} |`);
-
-      return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
     } catch {
-      return { content: [{ type: "text" as const, text: `Branch \`${params.branch}\` has no protection rules configured.` }] };
+      return { content: [{ type: "text" as const, text: toonFormat({ branch: params.branch, protection: "none" }) }] };
     }
   });
 
@@ -161,28 +137,6 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
       base: params.base,
       head: params.head,
     });
-    const data = resp.data as Record<string, unknown>;
-
-    const lines = [
-      `# Compare \`${params.base}\` ← \`${params.head}\``,
-      "",
-      "| Metric | Value |",
-      "| --- | --- |",
-      `| **Status** | ${data.status} |`,
-      `| **Ahead by** | ${data.ahead_by} commits |`,
-      `| **Behind by** | ${data.behind_by} commits |`,
-      `| **Total commits** | ${data.total_commits} |`,
-    ];
-
-    const files = data.files as Array<Record<string, unknown>> | undefined;
-    if (files?.length) {
-      lines.push("", "## Changed Files", "");
-      lines.push("| File | Status | Changes |", "| --- | --- | --- |");
-      for (const f of files) {
-        lines.push(`| \`${f.filename}\` | ${f.status} | +${f.additions}/-${f.deletions} |`);
-      }
-    }
-
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
   });
 }

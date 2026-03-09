@@ -2,8 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
-import { withDefaults, formatDate } from "../utils/helpers.js";
-import { formatRelease } from "../utils/markdown.js";
+import { withDefaults } from "../utils/helpers.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerReleaseTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -24,14 +24,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       per_page: params.per_page,
     });
     if (releases.length === 0) return { content: [{ type: "text" as const, text: "No releases found." }] };
-
-    const lines = ["| Tag | Name | Prerelease | Published |", "| --- | --- | --- | --- |"];
-    for (const r of releases as Record<string, unknown>[]) {
-      lines.push(
-        `| \`${r.tag_name}\` | ${r.name || "-"} | ${r.prerelease ? "Yes" : "No"} | ${formatDate(r.published_at as string)} |`
-      );
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    return { content: [{ type: "text" as const, text: toonFormat(releases) }] };
   });
 
   server.registerTool("get_release", {
@@ -56,7 +49,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       const resp = await client.octokit.rest.repos.getLatestRelease({ owner, repo });
       data = resp.data;
     }
-    return { content: [{ type: "text" as const, text: formatRelease(data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 
   if (isGateEnabled("write", config)) {
@@ -87,7 +80,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
         target_commitish: params.target_commitish,
         generate_release_notes: params.generate_release_notes,
       });
-      return { content: [{ type: "text" as const, text: formatRelease(data as Record<string, unknown>) }] };
+      return { content: [{ type: "text" as const, text: toonFormat(data) }] };
     });
   }
 
@@ -107,13 +100,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       per_page: params.per_page,
     });
     if (tags.length === 0) return { content: [{ type: "text" as const, text: "No tags found." }] };
-
-    const lines = ["| Tag | SHA |", "| --- | --- |"];
-    for (const t of tags as Record<string, unknown>[]) {
-      const commit = t.commit as Record<string, unknown>;
-      lines.push(`| \`${t.name}\` | \`${(commit?.sha as string)?.slice(0, 7)}\` |`);
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    return { content: [{ type: "text" as const, text: toonFormat(tags) }] };
   });
 
   server.registerTool("generate_release_notes", {
@@ -135,6 +122,6 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
       target_commitish: params.target_commitish,
       previous_tag_name: params.previous_tag_name,
     });
-    return { content: [{ type: "text" as const, text: `# ${data.name}\n\n${data.body}` }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 }

@@ -2,8 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
-import { withDefaults, formatDate } from "../utils/helpers.js";
-import { formatPR, formatPRList, formatCommitList } from "../utils/markdown.js";
+import { withDefaults } from "../utils/helpers.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerPullRequestTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -33,7 +33,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       direction: params.direction,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: formatPRList(prs as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(prs) }] };
   });
 
   server.registerTool("get_pull_request", {
@@ -47,7 +47,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);
     const resp = await client.octokit.rest.pulls.get({ owner, repo, pull_number: params.pull_number });
-    return { content: [{ type: "text" as const, text: formatPR(resp.data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
   });
 
   if (isGateEnabled("write", config)) {
@@ -74,7 +74,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         base: params.base,
         draft: params.draft,
       });
-      return { content: [{ type: "text" as const, text: formatPR(resp.data as Record<string, unknown>) }] };
+      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
     });
 
     server.registerTool("update_pull_request", {
@@ -101,7 +101,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         state,
         base,
       });
-      return { content: [{ type: "text" as const, text: formatPR(resp.data as Record<string, unknown>) }] };
+      return { content: [{ type: "text" as const, text: toonFormat(resp.data) }] };
     });
 
     server.registerTool("merge_pull_request", {
@@ -198,7 +198,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       pull_number: params.pull_number,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: formatCommitList(commits as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(commits) }] };
   });
 
   server.registerTool("list_pr_files", {
@@ -263,22 +263,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       pull_number: params.pull_number,
     });
     if (reviews.length === 0) return { content: [{ type: "text" as const, text: "No reviews yet." }] };
-
-    const lines = ["| Reviewer | State | Submitted |", "| --- | --- | --- |"];
-    for (const r of reviews as Record<string, unknown>[]) {
-      lines.push(
-        `| @${(r.user as Record<string, unknown>)?.login ?? "?"} | **${r.state}** | ${formatDate(r.submitted_at as string)} |`
-      );
-    }
-    if (reviews.some((r) => (r as Record<string, unknown>).body)) {
-      lines.push("", "---", "");
-      for (const r of reviews as Record<string, unknown>[]) {
-        if (r.body) {
-          lines.push(`**@${(r.user as Record<string, unknown>)?.login}** (${r.state}):`, "", r.body as string, "");
-        }
-      }
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    return { content: [{ type: "text" as const, text: toonFormat(reviews) }] };
   });
 
   server.registerTool("list_pr_review_comments", {
@@ -299,19 +284,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       per_page: params.per_page,
     });
     if (comments.length === 0) return { content: [{ type: "text" as const, text: "No review comments." }] };
-
-    const lines: string[] = [];
-    for (const c of comments as Record<string, unknown>[]) {
-      lines.push(
-        `**@${(c.user as Record<string, unknown>)?.login}** on \`${c.path}\` (line ${c.line ?? c.original_line ?? "?"}):`,
-        "",
-        c.body as string,
-        "",
-        "---",
-        ""
-      );
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    return { content: [{ type: "text" as const, text: toonFormat(comments) }] };
   });
 
   server.registerTool("list_pr_checks", {
@@ -337,28 +310,12 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       client.octokit.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha }),
     ]);
 
-    const lines = [`# Checks for PR #${params.pull_number} (${sha.slice(0, 7)})`, ""];
-
-    const checks = checksResp.data.check_runs;
-    if (checks.length > 0) {
-      lines.push("## Check Runs", "", "| Name | Status | Conclusion | URL |", "| --- | --- | --- | --- |");
-      for (const c of checks) {
-        lines.push(`| ${c.name} | ${c.status} | ${c.conclusion ?? "pending"} | ${c.html_url ?? "-"} |`);
-      }
-    }
-
-    const statuses = statusResp.data.statuses;
-    if (statuses?.length) {
-      lines.push("", "## Commit Statuses", "", "| Context | State | Description |", "| --- | --- | --- |");
-      for (const s of statuses) {
-        lines.push(`| ${s.context} | ${s.state} | ${s.description ?? "-"} |`);
-      }
-    }
-
-    if (checks.length === 0 && (!statuses || statuses.length === 0)) {
-      lines.push("No checks or statuses found.");
-    }
-
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    const data = {
+      pull_number: params.pull_number,
+      head_sha: sha.slice(0, 7),
+      check_runs: checksResp.data.check_runs,
+      statuses: statusResp.data.statuses,
+    };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 }

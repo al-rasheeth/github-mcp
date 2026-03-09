@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
-import { formatUser, formatNotificationList } from "../utils/markdown.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerUserTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -13,7 +13,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
     annotations: READ_ANNOTATION,
   }, async () => {
     const { data } = await client.octokit.rest.users.getAuthenticated();
-    return { content: [{ type: "text" as const, text: formatUser(data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 
   server.registerTool("get_user", {
@@ -24,7 +24,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
     annotations: READ_ANNOTATION,
   }, async (params) => {
     const { data } = await client.octokit.rest.users.getByUsername({ username: params.username });
-    return { content: [{ type: "text" as const, text: formatUser(data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 
   server.registerTool("list_notifications", {
@@ -46,7 +46,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
         per_page: params.per_page,
       }
     );
-    return { content: [{ type: "text" as const, text: formatNotificationList(notifications as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(notifications) }] };
   });
 
   if (isGateEnabled("write", config)) {

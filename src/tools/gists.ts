@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { isGateEnabled, READ_ANNOTATION, WRITE_ANNOTATION } from "./registry.js";
-import { formatGist, formatGistList } from "../utils/markdown.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerGistTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -31,7 +31,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
       });
       gists = data as Record<string, unknown>[];
     }
-    return { content: [{ type: "text" as const, text: formatGistList(gists) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(gists) }] };
   });
 
   server.registerTool("get_gist", {
@@ -42,7 +42,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
     annotations: READ_ANNOTATION,
   }, async (params) => {
     const { data } = await client.octokit.rest.gists.get({ gist_id: params.gist_id });
-    return { content: [{ type: "text" as const, text: formatGist(data as Record<string, unknown>) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(data) }] };
   });
 
   if (isGateEnabled("write", config)) {
@@ -62,7 +62,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
         public: params.public,
         files: params.files,
       });
-      return { content: [{ type: "text" as const, text: formatGist(data as Record<string, unknown>) }] };
+      return { content: [{ type: "text" as const, text: toonFormat(data) }] };
     });
 
     server.registerTool("update_gist", {
@@ -85,7 +85,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
         // @ts-expect-error - API supports null to delete files
         files: body.files,
       });
-      return { content: [{ type: "text" as const, text: formatGist(data as Record<string, unknown>) }] };
+      return { content: [{ type: "text" as const, text: toonFormat(data) }] };
     });
   }
 }

@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { READ_ANNOTATION } from "./registry.js";
 import { withOwnerDefault } from "../utils/helpers.js";
-import { formatRepoList } from "../utils/markdown.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
   const { client, config } = ctx;
@@ -25,11 +25,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
     });
 
     if (members.length === 0) return { content: [{ type: "text" as const, text: "No members found." }] };
-    const lines = ["| User | Type | URL |", "| --- | --- | --- |"];
-    for (const m of members as Record<string, unknown>[]) {
-      lines.push(`| @${m.login} | ${m.type} | ${m.html_url} |`);
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    return { content: [{ type: "text" as const, text: toonFormat(members) }] };
   });
 
   server.registerTool("list_org_repos", {
@@ -51,7 +47,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
       direction: params.direction,
       per_page: params.per_page,
     });
-    return { content: [{ type: "text" as const, text: formatRepoList(repos as Record<string, unknown>[]) }] };
+    return { content: [{ type: "text" as const, text: toonFormat(repos) }] };
   });
 
   server.registerTool("list_teams", {
@@ -69,10 +65,6 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
     });
 
     if (teams.length === 0) return { content: [{ type: "text" as const, text: "No teams found." }] };
-    const lines = ["| ID | Name | Slug | Privacy | URL |", "| --- | --- | --- | --- | --- |"];
-    for (const t of teams as Record<string, unknown>[]) {
-      lines.push(`| ${t.id} | ${t.name} | \`${t.slug}\` | ${t.privacy} | ${t.html_url} |`);
-    }
-    return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    return { content: [{ type: "text" as const, text: toonFormat(teams) }] };
   });
 }

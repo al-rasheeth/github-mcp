@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./registry.js";
 import { READ_ANNOTATION } from "./registry.js";
-import { formatSearchResults } from "../utils/markdown.js";
+import { toonFormat } from "../utils/toon.js";
 
 export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
   const { client } = ctx;
@@ -24,7 +24,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
     return {
-      content: [{ type: "text" as const, text: formatSearchResults(data.items as Record<string, unknown>[], "code", data.total_count) }],
+      content: [{ type: "text" as const, text: toonFormat({ total_count: data.total_count, items: data.items }) }],
     };
   });
 
@@ -45,7 +45,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
     return {
-      content: [{ type: "text" as const, text: formatSearchResults(data.items as Record<string, unknown>[], "repos", data.total_count) }],
+      content: [{ type: "text" as const, text: toonFormat({ total_count: data.total_count, items: data.items }) }],
     };
   });
 
@@ -66,7 +66,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
     return {
-      content: [{ type: "text" as const, text: formatSearchResults(data.items as Record<string, unknown>[], "users", data.total_count) }],
+      content: [{ type: "text" as const, text: toonFormat({ total_count: data.total_count, items: data.items }) }],
     };
   });
 
@@ -87,7 +87,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       per_page: params.per_page,
     });
     return {
-      content: [{ type: "text" as const, text: formatSearchResults(data.items as Record<string, unknown>[], "commits", data.total_count) }],
+      content: [{ type: "text" as const, text: toonFormat({ total_count: data.total_count, items: data.items }) }],
     };
   });
 }

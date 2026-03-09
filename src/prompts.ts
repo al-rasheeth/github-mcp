@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GitHubClient } from "./github/client.js";
 import type { Config } from "./config.js";
 import { withDefaults, decodeBase64 } from "./utils/helpers.js";
+import { toonFormat } from "./utils/toon.js";
 
 export function registerPrompts(server: McpServer, client: GitHubClient, config: Config): void {
 
@@ -24,36 +25,21 @@ export function registerPrompts(server: McpServer, client: GitHubClient, config:
       client.octokit.paginate(client.octokit.rest.pulls.listReviews, { owner, repo, pull_number: prNum }),
     ]);
 
-    const pr = prResp.data;
     const diff = diffResp.data as unknown as string;
-    const fileList = files.map((f) => `- \`${f.filename}\` (${f.status}, +${f.additions}/-${f.deletions})`).join("\n");
-    const existingReviews = reviews.map((r) =>
-      `- @${r.user?.login}: ${r.state}${r.body ? ` — "${r.body}"` : ""}`
-    ).join("\n") || "None yet";
-
+    const data = toonFormat({ pr: prResp.data, files, reviews });
+    const instructions = [
+      "Please review this pull request thoroughly. For each issue found:",
+      "1. Identify the file and line number",
+      "2. Explain the problem",
+      "3. Suggest a specific fix",
+      "",
+      "Focus on: correctness, security, performance, maintainability, and adherence to project conventions.",
+      "If the PR looks good, say so and highlight any particularly well-done aspects.",
+    ].join("\n");
     return {
       messages: [{
         role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: [
-            `# Code Review: PR #${prNum} — ${pr.title}`,
-            "", `**Author:** @${pr.user?.login}`,
-            `**Branch:** \`${pr.head.ref}\` → \`${pr.base.ref}\``,
-            `**Description:**\n${pr.body || "No description provided."}`,
-            "", `## Changed Files`, fileList,
-            "", `## Existing Reviews`, existingReviews,
-            "", `## Full Diff`, "```diff", diff, "```",
-            "", "---", "",
-            "Please review this pull request thoroughly. For each issue found:",
-            "1. Identify the file and line number",
-            "2. Explain the problem",
-            "3. Suggest a specific fix",
-            "",
-            "Focus on: correctness, security, performance, maintainability, and adherence to project conventions.",
-            "If the PR looks good, say so and highlight any particularly well-done aspects.",
-          ].join("\n"),
-        },
+        content: { type: "text" as const, text: `${data}\n\n---\n\n## Full Diff\n${diff}\n\n---\n\n${instructions}` },
       }],
     };
   });
@@ -74,37 +60,21 @@ export function registerPrompts(server: McpServer, client: GitHubClient, config:
       client.octokit.rest.repos.listCommits({ owner, repo, per_page: 10 }),
     ]);
 
-    const r = repoResp.data;
-    const recentCommits = commitsResp.data.map((c) =>
-      `- \`${c.sha.slice(0, 7)}\` ${c.commit.message.split("\n")[0]} (${c.commit.author?.name})`
-    ).join("\n");
-
+    const data = toonFormat({
+      repo: repoResp.data,
+      recent_commits: commitsResp.data,
+      open_issues: issuesResp.data,
+      open_prs: prsResp.data,
+    });
+    const instructions = [
+      "Please assess the health of this repository. Consider:",
+      "- Activity level and momentum",
+      "- Issue/PR management (are things getting addressed?)",
+      "- Code maintenance signals",
+      "- Recommendations for improvement",
+    ].join("\n");
     return {
-      messages: [{
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: [
-            `# Repository Health Check: ${owner}/${repo}`,
-            "", `**Description:** ${r.description || "N/A"}`,
-            `**Stars:** ${r.stargazers_count} | **Forks:** ${r.forks_count} | **Open Issues:** ${r.open_issues_count}`,
-            `**Default Branch:** \`${r.default_branch}\``,
-            `**Last Push:** ${r.pushed_at}`,
-            `**Language:** ${r.language || "N/A"}`,
-            "", `## Recent Commits`, recentCommits,
-            "", `## Open Issues (sample)`,
-            issuesResp.data.map((i) => `- #${i.number}: ${i.title}`).join("\n") || "None",
-            "", `## Open PRs (sample)`,
-            prsResp.data.map((p) => `- #${p.number}: ${p.title}`).join("\n") || "None",
-            "", "---", "",
-            "Please assess the health of this repository. Consider:",
-            "- Activity level and momentum",
-            "- Issue/PR management (are things getting addressed?)",
-            "- Code maintenance signals",
-            "- Recommendations for improvement",
-          ].join("\n"),
-        },
-      }],
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: `${data}\n\n---\n\n${instructions}` } }],
     };
   });
 
@@ -121,32 +91,18 @@ export function registerPrompts(server: McpServer, client: GitHubClient, config:
     const head = params.head || "HEAD";
 
     const { data } = await client.octokit.rest.repos.compareCommits({ owner, repo, base: params.base, head });
-    const commits = data.commits.map((c) =>
-      `- ${c.commit.message.split("\n")[0]} (\`${c.sha.slice(0, 7)}\`)`
-    ).join("\n") || "No commits found";
-
+    const payload = toonFormat(data);
+    const instructions = [
+      "Please generate well-formatted release notes. Group into:",
+      "- Features (new functionality)",
+      "- Bug Fixes",
+      "- Improvements (refactors, performance)",
+      "- Breaking Changes (if any)",
+      "- Other",
+      "", "Write in a user-friendly style suitable for a CHANGELOG or GitHub release.",
+    ].join("\n");
     return {
-      messages: [{
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: [
-            `# Generate Release Notes: ${params.base} → ${head}`,
-            "", `**Repository:** ${owner}/${repo}`,
-            `**Total commits:** ${data.total_commits}`,
-            `**Ahead by:** ${data.ahead_by} | **Behind by:** ${data.behind_by}`,
-            "", `## Commits`, commits,
-            "", "---", "",
-            "Please generate well-formatted release notes. Group into:",
-            "- **Features** (new functionality)",
-            "- **Bug Fixes**",
-            "- **Improvements** (refactors, performance)",
-            "- **Breaking Changes** (if any)",
-            "- **Other**",
-            "", "Write in a user-friendly style suitable for a CHANGELOG or GitHub release.",
-          ].join("\n"),
-        },
-      }],
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: `${payload}\n\n---\n\n${instructions}` } }],
     };
   });
 
@@ -165,34 +121,16 @@ export function registerPrompts(server: McpServer, client: GitHubClient, config:
       client.octokit.rest.issues.get({ owner, repo, issue_number: num }),
       client.octokit.paginate(client.octokit.rest.issues.listComments, { owner, repo, issue_number: num, per_page: 100 }),
     ]);
-
-    const issue = issueResp.data;
-    const labels = issue.labels.map((l) => typeof l === "string" ? l : l.name).join(", ");
-    const commentText = comments.map((c) =>
-      `**@${c.user?.login}:**\n${c.body}\n`
-    ).join("\n---\n\n") || "No comments";
-
+    const data = toonFormat({ issue: issueResp.data, comments });
+    const instructions = [
+      "Please analyze this issue and provide:",
+      "1. Root Cause Analysis — What's the underlying problem?",
+      "2. Implementation Plan — Step-by-step approach to resolve it",
+      "3. Risks & Considerations — Edge cases, backward compatibility, testing needs",
+      "4. Estimated Complexity — Simple / Medium / Complex",
+    ].join("\n");
     return {
-      messages: [{
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: [
-            `# Issue Analysis: #${num} — ${issue.title}`,
-            "", `**State:** ${issue.state} | **Labels:** ${labels || "none"}`,
-            `**Author:** @${issue.user?.login}`,
-            `**Created:** ${issue.created_at}`,
-            "", `## Description`, issue.body || "No description",
-            "", `## Discussion (${comments.length} comments)`, commentText,
-            "", "---", "",
-            "Please analyze this issue and provide:",
-            "1. **Root Cause Analysis** — What's the underlying problem?",
-            "2. **Implementation Plan** — Step-by-step approach to resolve it",
-            "3. **Risks & Considerations** — Edge cases, backward compatibility, testing needs",
-            "4. **Estimated Complexity** — Simple / Medium / Complex",
-          ].join("\n"),
-        },
-      }],
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: `${data}\n\n---\n\n${instructions}` } }],
     };
   });
 
@@ -211,38 +149,15 @@ export function registerPrompts(server: McpServer, client: GitHubClient, config:
       client.octokit.rest.actions.getWorkflowRun({ owner, repo, run_id: runId }),
       client.octokit.rest.actions.listJobsForWorkflowRun({ owner, repo, run_id: runId, filter: "latest" }),
     ]);
-
-    const run = runResp.data;
-    const failedJobs = jobsResp.data.jobs.filter((j) => j.conclusion === "failure");
-    const jobDetails = failedJobs.map((job) => {
-      const failedSteps = (job.steps ?? []).filter((s) => s.conclusion === "failure");
-      return [
-        `### ${job.name} (${job.conclusion})`, "",
-        failedSteps.map((s) => `- Step ${s.number}: **${s.name}** — FAILED`).join("\n") || "No specific step failures identified", "",
-      ].join("\n");
-    }).join("\n") || "No failed jobs identified.";
-
+    const data = toonFormat({ run: runResp.data, jobs: jobsResp.data.jobs });
+    const instructions = [
+      "Please diagnose this workflow failure:",
+      "1. Identify the root cause from the failed steps",
+      "2. Suggest specific fixes",
+      "3. Indicate if this is a flaky test, config issue, code bug, or environment problem",
+    ].join("\n");
     return {
-      messages: [{
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: [
-            `# Workflow Failure Diagnosis`,
-            "", `**Workflow:** ${run.name}`,
-            `**Run #:** ${run.run_number} (ID: ${runId})`,
-            `**Status:** ${run.status} | **Conclusion:** ${run.conclusion}`,
-            `**Branch:** \`${run.head_branch}\` | **Event:** ${run.event}`,
-            `**Commit:** \`${run.head_sha.slice(0, 7)}\``,
-            "", `## Failed Jobs`, jobDetails,
-            "", "---", "",
-            "Please diagnose this workflow failure:",
-            "1. Identify the root cause from the failed steps",
-            "2. Suggest specific fixes",
-            "3. Indicate if this is a flaky test, config issue, code bug, or environment problem",
-          ].join("\n"),
-        },
-      }],
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: `${data}\n\n---\n\n${instructions}` } }],
     };
   });
 
@@ -267,31 +182,17 @@ export function registerPrompts(server: McpServer, client: GitHubClient, config:
     ];
 
     const depFiles = files.filter((f) => depPatterns.some((p) => f.filename.endsWith(p)));
-    const depContents = depFiles.map((f) => [
-      `### \`${f.filename}\` (${f.status})`, "",
-      f.patch ? `\`\`\`diff\n${f.patch}\n\`\`\`` : "(no diff available)", "",
-    ].join("\n")).join("\n") || "No dependency files changed.";
-
+    const data = toonFormat({ pr_number: prNum, repository: `${owner}/${repo}`, dependency_files: depFiles });
+    const instructions = [
+      "Please review these dependency changes:",
+      "1. New dependencies — Are they well-maintained? Any known vulnerabilities?",
+      "2. Version changes — Are there breaking changes in major bumps?",
+      "3. Removed dependencies — Is removal safe?",
+      "4. Lock file consistency — Do lock file changes match manifest changes?",
+      "5. Security concerns — Any dependencies with known CVEs?",
+    ].join("\n");
     return {
-      messages: [{
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: [
-            `# Dependency Review: PR #${prNum}`,
-            "", `**Repository:** ${owner}/${repo}`,
-            `**Dependency files changed:** ${depFiles.length}`,
-            "", depContents,
-            "", "---", "",
-            "Please review these dependency changes:",
-            "1. **New dependencies** — Are they well-maintained? Any known vulnerabilities?",
-            "2. **Version changes** — Are there breaking changes in major bumps?",
-            "3. **Removed dependencies** — Is removal safe?",
-            "4. **Lock file consistency** — Do lock file changes match manifest changes?",
-            "5. **Security concerns** — Any dependencies with known CVEs?",
-          ].join("\n"),
-        },
-      }],
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: `${data}\n\n---\n\n${instructions}` } }],
     };
   });
 
@@ -316,50 +217,29 @@ export function registerPrompts(server: McpServer, client: GitHubClient, config:
       readme = decodeBase64((readmeResp.data as unknown as { content: string }).content);
     } catch { /* no readme */ }
 
-    let tree = "File tree unavailable.";
+    let tree: unknown[] = [];
     try {
       const treeResp = await client.octokit.rest.git.getTree({ owner, repo, tree_sha: repoResp.data.default_branch, recursive: "1" });
-      tree = treeResp.data.tree
-        .filter((t) => t.type === "blob")
-        .map((t) => `- \`${t.path}\``)
-        .slice(0, 200)
-        .join("\n");
-      if (treeResp.data.tree.length > 200) tree += "\n- ... (truncated)";
+      tree = treeResp.data.tree.filter((t) => t.type === "blob").slice(0, 200);
     } catch { /* no tree */ }
 
-    const langs = Object.entries(langsResp.data);
-    const totalBytes = langs.reduce((a, [, b]) => a + b, 0);
-    const langBreakdown = langs.map(([lang, bytes]) =>
-      `- ${lang}: ${((bytes / totalBytes) * 100).toFixed(1)}%`
-    ).join("\n") || "No language data";
-
-    const recentCommits = commitsResp.data.map((c) =>
-      `- ${c.commit.message.split("\n")[0]}`
-    ).join("\n");
-
+    const payload = toonFormat({
+      repo: repoResp.data,
+      languages: langsResp.data,
+      file_tree: tree,
+      recent_commits: commitsResp.data,
+      readme,
+    });
+    const instructions = [
+      "Based on the above, please provide:",
+      "1. Architecture Overview — High-level structure and key components",
+      "2. Tech Stack — Languages, frameworks, tools, and patterns used",
+      "3. Key Directories — What each major directory contains",
+      "4. Entry Points — Where to start reading the code",
+      "5. Development Workflow — How to build, test, and run the project",
+    ].join("\n");
     return {
-      messages: [{
-        role: "user" as const,
-        content: {
-          type: "text" as const,
-          text: [
-            `# Codebase Overview: ${owner}/${repo}`,
-            "", `**Description:** ${repoResp.data.description || "N/A"}`,
-            `**Default Branch:** \`${repoResp.data.default_branch}\``,
-            "", `## Languages`, langBreakdown,
-            "", `## File Structure`, tree,
-            "", `## Recent Activity`, recentCommits,
-            "", `## README`, readme,
-            "", "---", "",
-            "Based on the above, please provide:",
-            "1. **Architecture Overview** — High-level structure and key components",
-            "2. **Tech Stack** — Languages, frameworks, tools, and patterns used",
-            "3. **Key Directories** — What each major directory contains",
-            "4. **Entry Points** — Where to start reading the code",
-            "5. **Development Workflow** — How to build, test, and run the project",
-          ].join("\n"),
-        },
-      }],
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: `${payload}\n\n---\n\n${instructions}` } }],
     };
   });
 }

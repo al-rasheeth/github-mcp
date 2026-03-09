@@ -14,6 +14,7 @@
     "@octokit/plugin-retry": "^8.1.0",
     "@octokit/plugin-throttling": "^11.0.3",
     "@octokit/rest": "^22.0.1",
+    "@toon-format/toon": "^2.1.0",
     "lru-cache": "^11.1.0",
     "undici": "^7.22.0",
     "zod": "^3.24.2"
