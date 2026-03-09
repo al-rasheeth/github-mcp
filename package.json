@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "start": "node build/index.js"
+    "start": "node build/index.js",
+    "test-client": "tsx scripts/test-client.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
@@ -15,12 +16,15 @@
     "@octokit/plugin-throttling": "^11.0.3",
     "@octokit/rest": "^22.0.1",
     "@toon-format/toon": "^2.1.0",
+    "dotenv": "^17.3.1",
+    "https-proxy-agent": "^7.0.6",
     "lru-cache": "^11.1.0",
-    "undici": "^7.22.0",
+    "node-fetch": "^2.7.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
+    "@types/node-fetch": "^2.6.13",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   },

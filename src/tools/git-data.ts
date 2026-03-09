@@ -14,7 +14,7 @@ export function registerGitDataTools(server: McpServer, ctx: ToolContext): void 
       owner: z.string().optional(),
       repo: z.string().optional(),
       tree_sha: z.string().describe("Tree SHA or branch name (e.g. 'main')"),
-      recursive: z.boolean().optional().default(true),
+      recursive: z.coerce.boolean().optional().default(true),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {

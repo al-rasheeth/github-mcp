@@ -15,7 +15,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -35,11 +35,11 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      workflow_id: z.union([z.string(), z.number()]).optional().describe("Workflow ID or filename"),
+      workflow_id: z.union([z.string(), z.coerce.number()]).optional().describe("Workflow ID or filename"),
       branch: z.string().optional(),
       event: z.string().optional(),
       status: z.enum(["completed", "action_required", "cancelled", "failure", "neutral", "skipped", "stale", "success", "timed_out", "in_progress", "queued", "requested", "waiting", "pending"]).optional(),
-      per_page: z.number().min(1).max(100).optional().default(20),
+      per_page: z.coerce.number().min(1).max(100).optional().default(20),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -76,7 +76,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      run_id: z.number().describe("Workflow run ID"),
+      run_id: z.coerce.number().describe("Workflow run ID"),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -94,7 +94,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      run_id: z.number(),
+      run_id: z.coerce.number(),
       filter: z.enum(["latest", "all"]).optional().default("latest"),
     },
     annotations: READ_ANNOTATION,
@@ -116,7 +116,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      run_id: z.number(),
+      run_id: z.coerce.number(),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -139,7 +139,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      workflow_id: z.union([z.string(), z.number()]).describe("Workflow ID or filename (e.g. 'deploy.yml')"),
+      workflow_id: z.union([z.string(), z.coerce.number()]).describe("Workflow ID or filename (e.g. 'deploy.yml')"),
       ref: z.string().describe("Branch or tag to run on"),
       inputs: z.record(z.string()).optional().describe("Workflow input parameters"),
     },
@@ -161,7 +161,7 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      run_id: z.number(),
+      run_id: z.coerce.number(),
     },
     annotations: WRITE_ANNOTATION,
   }, async (params) => {
@@ -179,8 +179,8 @@ export function registerActionTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      run_id: z.number(),
-      enable_debug_logging: z.boolean().optional().default(false),
+      run_id: z.coerce.number(),
+      enable_debug_logging: z.coerce.boolean().optional().default(false),
     },
     annotations: WRITE_ANNOTATION,
   }, async (params) => {

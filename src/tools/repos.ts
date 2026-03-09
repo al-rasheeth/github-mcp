@@ -15,7 +15,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       type: z.enum(["all", "owner", "public", "private", "member"]).optional().describe("Filter by type"),
       sort: z.enum(["created", "updated", "pushed", "full_name"]).optional().describe("Sort field"),
       direction: z.enum(["asc", "desc"]).optional(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -51,8 +51,8 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         name: z.string().describe("Repository name"),
         description: z.string().optional(),
-        private: z.boolean().optional().default(false),
-        auto_init: z.boolean().optional().default(false),
+        private: z.coerce.boolean().optional().default(false),
+        auto_init: z.coerce.boolean().optional().default(false),
         gitignore_template: z.string().optional(),
         license_template: z.string().optional(),
         org: z.string().optional().describe("Create under this org instead of user"),
@@ -77,12 +77,12 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
         repo: z.string().optional(),
         description: z.string().optional(),
         homepage: z.string().optional(),
-        private: z.boolean().optional(),
-        has_issues: z.boolean().optional(),
-        has_projects: z.boolean().optional(),
-        has_wiki: z.boolean().optional(),
+        private: z.coerce.boolean().optional(),
+        has_issues: z.coerce.boolean().optional(),
+        has_projects: z.coerce.boolean().optional(),
+        has_wiki: z.coerce.boolean().optional(),
         default_branch: z.string().optional(),
-        archived: z.boolean().optional(),
+        archived: z.coerce.boolean().optional(),
       },
       annotations: WRITE_ANNOTATION,
     }, async (params) => {
@@ -120,7 +120,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        confirm: z.boolean().describe("Must be true to confirm deletion"),
+        confirm: z.coerce.boolean().describe("Must be true to confirm deletion"),
       },
       annotations: DESTRUCTIVE_ANNOTATION,
     }, async (params) => {
@@ -156,7 +156,7 @@ export function registerRepoTools(server: McpServer, ctx: ToolContext): void {
 
   server.registerTool("list_contributors", {
     description: "List contributors with commit counts",
-    inputSchema: { owner: z.string().optional(), repo: z.string().optional(), per_page: z.number().min(1).max(100).optional().default(30) },
+    inputSchema: { owner: z.string().optional(), repo: z.string().optional(), per_page: z.coerce.number().min(1).max(100).optional().default(30) },
     annotations: READ_ANNOTATION,
   }, async (params) => {
     const { owner, repo } = withDefaults(params, config);

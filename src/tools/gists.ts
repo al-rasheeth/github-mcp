@@ -12,7 +12,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       username: z.string().optional().describe("User login (omit for authenticated user)"),
       since: z.string().optional().describe("ISO 8601 timestamp to filter by"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -50,7 +50,7 @@ export function registerGistTools(server: McpServer, ctx: ToolContext): void {
       description: "Create a new gist",
       inputSchema: {
         description: z.string().optional(),
-        public: z.boolean().optional().default(false),
+        public: z.coerce.boolean().optional().default(false),
         files: z.record(z.object({
           content: z.string(),
         })).describe("Map of filename to content"),

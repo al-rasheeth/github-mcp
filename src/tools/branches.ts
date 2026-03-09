@@ -13,8 +13,8 @@ export function registerBranchTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      protected: z.boolean().optional().describe("Filter by protected status"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      protected: z.coerce.boolean().optional().describe("Filter by protected status"),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {

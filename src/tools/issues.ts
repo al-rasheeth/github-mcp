@@ -14,7 +14,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       query: z.string().describe("GitHub search query (e.g. 'is:issue is:open label:bug repo:owner/repo')"),
       sort: z.enum(["comments", "reactions", "reactions-+1", "reactions--1", "interactions", "created", "updated"]).optional(),
       order: z.enum(["asc", "desc"]).optional().default("desc"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -39,7 +39,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       milestone: z.string().optional().describe("Milestone number or '*' or 'none'"),
       sort: z.enum(["created", "updated", "comments"]).optional(),
       direction: z.enum(["asc", "desc"]).optional(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -64,7 +64,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      issue_number: z.number().describe("Issue number"),
+      issue_number: z.coerce.number().describe("Issue number"),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -83,7 +83,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
         body: z.string().optional(),
         labels: z.array(z.string()).optional(),
         assignees: z.array(z.string()).optional(),
-        milestone: z.number().optional(),
+        milestone: z.coerce.number().optional(),
       },
       annotations: WRITE_ANNOTATION,
     }, async (params) => {
@@ -105,13 +105,13 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        issue_number: z.number(),
+        issue_number: z.coerce.number(),
         title: z.string().optional(),
         body: z.string().optional(),
         state: z.enum(["open", "closed"]).optional(),
         labels: z.array(z.string()).optional(),
         assignees: z.array(z.string()).optional(),
-        milestone: z.number().nullable().optional(),
+        milestone: z.coerce.number().nullable().optional(),
       },
       annotations: WRITE_ANNOTATION,
     }, async (params) => {
@@ -135,7 +135,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        issue_number: z.number(),
+        issue_number: z.coerce.number(),
         body: z.string().describe("Comment body (markdown)"),
       },
       annotations: WRITE_ANNOTATION,
@@ -155,7 +155,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        issue_number: z.number(),
+        issue_number: z.coerce.number(),
         labels: z.array(z.string()).describe("Labels to add"),
       },
       annotations: WRITE_ANNOTATION,
@@ -176,7 +176,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        issue_number: z.number(),
+        issue_number: z.coerce.number(),
         label: z.string().describe("Label name to remove"),
       },
       annotations: WRITE_ANNOTATION,
@@ -196,7 +196,7 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        issue_number: z.number(),
+        issue_number: z.coerce.number(),
         lock_reason: z.enum(["off-topic", "too heated", "resolved", "spam"]).optional(),
       },
       annotations: WRITE_ANNOTATION,
@@ -217,8 +217,8 @@ export function registerIssueTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      issue_number: z.number(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      issue_number: z.coerce.number(),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {

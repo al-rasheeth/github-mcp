@@ -13,7 +13,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
     inputSchema: {
       org: z.string().optional().describe("Organization name (uses GITHUB_DEFAULT_OWNER if omitted)"),
       role: z.enum(["all", "admin", "member"]).optional().default("all"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -35,7 +35,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
       type: z.enum(["all", "public", "private", "forks", "sources", "member"]).optional().default("all"),
       sort: z.enum(["created", "updated", "pushed", "full_name"]).optional(),
       direction: z.enum(["asc", "desc"]).optional(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -54,7 +54,7 @@ export function registerOrgTools(server: McpServer, ctx: ToolContext): void {
     description: "List teams in an organization",
     inputSchema: {
       org: z.string().optional().describe("Organization name"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {

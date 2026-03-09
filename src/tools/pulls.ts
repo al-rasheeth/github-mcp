@@ -18,7 +18,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       base: z.string().optional().describe("Filter by base branch"),
       sort: z.enum(["created", "updated", "popularity", "long-running"]).optional(),
       direction: z.enum(["asc", "desc"]).optional(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -41,7 +41,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      pull_number: z.number().describe("PR number"),
+      pull_number: z.coerce.number().describe("PR number"),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -60,7 +60,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
         body: z.string().optional(),
         head: z.string().describe("Branch with changes"),
         base: z.string().describe("Branch to merge into"),
-        draft: z.boolean().optional().default(false),
+        draft: z.coerce.boolean().optional().default(false),
       },
       annotations: WRITE_ANNOTATION,
     }, async (params) => {
@@ -82,7 +82,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        pull_number: z.number(),
+        pull_number: z.coerce.number(),
         title: z.string().optional(),
         body: z.string().optional(),
         state: z.enum(["open", "closed"]).optional(),
@@ -109,7 +109,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        pull_number: z.number(),
+        pull_number: z.coerce.number(),
         merge_method: z.enum(["merge", "squash", "rebase"]).optional().default("merge"),
         commit_title: z.string().optional(),
         commit_message: z.string().optional(),
@@ -133,13 +133,13 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        pull_number: z.number(),
+        pull_number: z.coerce.number(),
         event: z.enum(["APPROVE", "REQUEST_CHANGES", "COMMENT"]).describe("Review action"),
         body: z.string().optional().describe("Review body"),
         comments: z.array(z.object({
           path: z.string(),
-          position: z.number().optional(),
-          line: z.number().optional(),
+          position: z.coerce.number().optional(),
+          line: z.coerce.number().optional(),
           body: z.string(),
         })).optional().describe("Inline comments"),
       },
@@ -162,7 +162,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
       inputSchema: {
         owner: z.string().optional(),
         repo: z.string().optional(),
-        pull_number: z.number(),
+        pull_number: z.coerce.number(),
         reviewers: z.array(z.string()).optional().describe("User logins"),
         team_reviewers: z.array(z.string()).optional().describe("Team slugs"),
       },
@@ -186,8 +186,8 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      pull_number: z.number(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      pull_number: z.coerce.number(),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -206,8 +206,8 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      pull_number: z.number(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      pull_number: z.coerce.number(),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -232,7 +232,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      pull_number: z.number(),
+      pull_number: z.coerce.number(),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -252,7 +252,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      pull_number: z.number(),
+      pull_number: z.coerce.number(),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -271,8 +271,8 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      pull_number: z.number(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      pull_number: z.coerce.number(),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -292,7 +292,7 @@ export function registerPullRequestTools(server: McpServer, ctx: ToolContext): v
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      pull_number: z.number(),
+      pull_number: z.coerce.number(),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {

@@ -13,7 +13,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -32,7 +32,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      release_id: z.number().optional().describe("Release ID"),
+      release_id: z.coerce.number().optional().describe("Release ID"),
       tag: z.string().optional().describe("Tag name (alternative to release_id)"),
     },
     annotations: READ_ANNOTATION,
@@ -61,10 +61,10 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
         tag_name: z.string().describe("Tag for the release"),
         name: z.string().optional(),
         body: z.string().optional().describe("Release notes (markdown)"),
-        draft: z.boolean().optional().default(false),
-        prerelease: z.boolean().optional().default(false),
+        draft: z.coerce.boolean().optional().default(false),
+        prerelease: z.coerce.boolean().optional().default(false),
         target_commitish: z.string().optional().describe("Branch or commit SHA"),
-        generate_release_notes: z.boolean().optional().default(false),
+        generate_release_notes: z.coerce.boolean().optional().default(false),
       },
       annotations: WRITE_ANNOTATION,
     }, async (params) => {
@@ -89,7 +89,7 @@ export function registerReleaseTools(server: McpServer, ctx: ToolContext): void 
     inputSchema: {
       owner: z.string().optional(),
       repo: z.string().optional(),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {

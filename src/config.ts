@@ -37,8 +37,12 @@ export function loadConfig(): Config {
   const raw = {
     githubToken: process.env.GITHUB_TOKEN ?? "",
     apiUrl: process.env.GITHUB_API_URL,
-    proxyUrl: process.env.GITHUB_PROXY_URL || process.env.HTTPS_PROXY || undefined,
-    insecure: process.env.GITHUB_INSECURE,
+    proxyUrl:
+      process.env.GITHUB_PROXY_URL ||
+      process.env.PROXY_URL ||
+      process.env.HTTPS_PROXY ||
+      undefined,
+    insecure: process.env.GITHUB_INSECURE ?? process.env.MCP_INSECURE,
     writeEnabled: process.env.GITHUB_WRITE_ENABLED,
     actionsEnabled: process.env.GITHUB_ACTIONS_ENABLED,
     dangerousEnabled: process.env.GITHUB_DANGEROUS_ENABLED,

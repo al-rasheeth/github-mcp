@@ -30,10 +30,10 @@ export function registerUserTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool("list_notifications", {
     description: "List notifications for the authenticated user",
     inputSchema: {
-      all: z.boolean().optional().default(false).describe("Include read notifications"),
-      participating: z.boolean().optional().default(false),
+      all: z.coerce.boolean().optional().default(false).describe("Include read notifications"),
+      participating: z.coerce.boolean().optional().default(false),
       since: z.string().optional().describe("ISO 8601 timestamp"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {

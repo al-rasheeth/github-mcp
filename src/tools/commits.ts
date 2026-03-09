@@ -18,7 +18,7 @@ export function registerCommitTools(server: McpServer, ctx: ToolContext): void {
       author: z.string().optional().describe("GitHub login or email"),
       since: z.string().optional().describe("ISO 8601 date"),
       until: z.string().optional().describe("ISO 8601 date"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {

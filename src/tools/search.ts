@@ -13,7 +13,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       query: z.string().describe("Search query (e.g. 'addClass repo:jquery/jquery language:js')"),
       sort: z.enum(["indexed"]).optional(),
       order: z.enum(["asc", "desc"]).optional().default("desc"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -32,7 +32,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       query: z.string().describe("Search query (e.g. 'language:typescript stars:>100')"),
       sort: z.enum(["stars", "forks", "help-wanted-issues", "updated"]).optional(),
       order: z.enum(["asc", "desc"]).optional().default("desc"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -51,7 +51,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       query: z.string().describe("Search query (e.g. 'type:org language:python')"),
       sort: z.enum(["followers", "repositories", "joined"]).optional(),
       order: z.enum(["asc", "desc"]).optional().default("desc"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
@@ -70,7 +70,7 @@ export function registerSearchTools(server: McpServer, ctx: ToolContext): void {
       query: z.string().describe("Search query (e.g. 'fix bug repo:owner/repo')"),
       sort: z.enum(["author-date", "committer-date"]).optional(),
       order: z.enum(["asc", "desc"]).optional().default("desc"),
-      per_page: z.number().min(1).max(100).optional().default(30),
+      per_page: z.coerce.number().min(1).max(100).optional().default(30),
     },
     annotations: READ_ANNOTATION,
   }, async (params) => {
